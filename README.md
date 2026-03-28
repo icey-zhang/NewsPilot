@@ -106,12 +106,6 @@ InfoAgent/
 | `TREND_LLM_RANK_TIMEOUT` | OS+AI 排序超时（秒） | 300 |
 | `TREND_LLM_DEBUG` | 开启调试日志 | 0 |
 
-## Contributors
-
-- [@icey-zhang](https://github.com/icey-zhang)
-- [Claude Code](https://claude.ai/claude-code) — Anthropic
-- [Codex](https://openai.com/codex) — OpenAI
-
 ## License
 
 MIT
