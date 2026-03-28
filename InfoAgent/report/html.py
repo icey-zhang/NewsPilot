@@ -25,6 +25,8 @@ def render_html_content(
     show_rss_new_items: bool = True,
     display_mode: str = "keyword",
     hide_rss_without_llm: bool = False,
+    os_ai_top_items: Optional[List[Dict]] = None,
+    os_ai_key_point: str = "",
 ) -> str:
     """渲染HTML内容
 
@@ -483,6 +485,85 @@ def render_html_content(
                 border-top: 2px dashed #e5e7eb;
             }
 
+            /* OS+AI Top Picks */
+            .os-ai-top {
+                margin-bottom: 28px;
+                background: linear-gradient(to right bottom, #ecfeff, #eef2ff);
+                border: 1px solid #dbeafe;
+                border-radius: 16px;
+                padding: 18px;
+                box-shadow: 0 4px 10px -4px rgba(37, 99, 235, 0.18);
+            }
+            .os-ai-top-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 12px;
+                margin-bottom: 14px;
+            }
+            .os-ai-top-title {
+                font-size: 16px;
+                font-weight: 800;
+                color: #1e3a8a;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                letter-spacing: -0.2px;
+            }
+            .os-ai-top-title::before {
+                content: '🧠';
+                font-size: 18px;
+            }
+            .os-ai-top-sub {
+                font-size: 12px;
+                color: #475569;
+                font-weight: 600;
+                background: rgba(255,255,255,0.65);
+                border: 1px solid rgba(255,255,255,0.8);
+                padding: 4px 10px;
+                border-radius: 999px;
+                white-space: nowrap;
+            }
+            .os-ai-top-item {
+                background: rgba(255, 255, 255, 0.86);
+                border: 1px solid rgba(226, 232, 240, 0.9);
+                border-radius: 14px;
+                padding: 14px 14px 12px 14px;
+                margin-bottom: 10px;
+            }
+            .os-ai-top-item:last-child { margin-bottom: 0; }
+            .os-ai-top-meta {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                flex-wrap: wrap;
+                margin-bottom: 8px;
+            }
+            .os-ai-top-badge {
+                font-size: 11px;
+                font-weight: 800;
+                color: white;
+                background: #2563eb;
+                padding: 2px 8px;
+                border-radius: 999px;
+            }
+            .os-ai-top-score {
+                font-size: 11px;
+                font-weight: 800;
+                color: #0f172a;
+                background: #e0e7ff;
+                padding: 2px 8px;
+                border-radius: 999px;
+            }
+            .os-ai-top-reason {
+                font-size: 13px;
+                color: #334155;
+                line-height: 1.55;
+                margin: 8px 0 0 0;
+                padding-left: 10px;
+                border-left: 3px solid #60a5fa;
+            }
+
             .rss-section-header {
                 display: flex;
                 align-items: center;
@@ -763,6 +844,82 @@ def render_html_content(
         html += """
                     </ul>
                 </div>"""
+
+    # OS + AI Top Picks 置顶（来自 LLM 自动挑选的 top_items）
+    if os_ai_top_items and isinstance(os_ai_top_items, list):
+        cleaned = []
+        for it in os_ai_top_items:
+            if not isinstance(it, dict):
+                continue
+            title = (it.get("title") or "").strip()
+            url = (it.get("url") or "").strip()
+            comment = (it.get("comment") or "").strip()
+            summary = (it.get("summary") or "").strip()
+            viewpoint = (it.get("viewpoint") or "").strip()
+            final_score = it.get("final_score")
+            if not title:
+                continue
+            cleaned.append(
+                {
+                    "title": title,
+                    "url": url,
+                    "comment": comment,
+                    "summary": summary,
+                    "viewpoint": viewpoint,
+                    "final_score": final_score,
+                }
+            )
+
+        if cleaned:
+            html += """
+                <div class="os-ai-top">
+                    <div class="os-ai-top-header">
+                        <div class="os-ai-top-title">本周 OS+AI 置顶 3 条</div>
+                        <div class="os-ai-top-sub">自动筛选 · 可直接周报</div>
+                    </div>
+            """
+            if os_ai_key_point:
+                html += f'<div class="os-ai-top-reason">要点：{html_escape(os_ai_key_point)}</div>'
+            for idx, it in enumerate(cleaned, start=1):
+                title = html_escape(it["title"])
+                url = html_escape(it["url"]) if it["url"] else ""
+                comment = html_escape(it["comment"]) if it["comment"] else ""
+                summary = html_escape(it["summary"]) if it.get("summary") else ""
+                viewpoint = html_escape(it["viewpoint"]) if it.get("viewpoint") else ""
+                score = it.get("final_score")
+                score_text = ""
+                try:
+                    if score is not None:
+                        score_text = f"{float(score):.1f}"
+                except Exception:
+                    score_text = ""
+
+                html += '<div class="os-ai-top-item">'
+                html += '<div class="os-ai-top-meta">'
+                html += f'<span class="os-ai-top-badge">TOP {idx}</span>'
+                if score_text:
+                    html += f'<span class="os-ai-top-score">综合分 {score_text}</span>'
+                html += "</div>"
+                html += '<div class="rss-title">'
+                if url:
+                    html += f'<a href="{url}" target="_blank" class="rss-link">{title}</a>'
+                else:
+                    html += title
+                html += "</div>"
+                if summary or viewpoint:
+                    html += '<div class="ai-insight-box">'
+                    if summary:
+                        html += f'<div class="ai-summary">{summary}</div>'
+                    if viewpoint:
+                        html += f'<div class="ai-viewpoint">{viewpoint}</div>'
+                    html += "</div>"
+                if comment:
+                    html += f'<div class="os-ai-top-reason">{comment}</div>'
+                html += "</div>"
+
+            html += """
+                </div>
+            """
 
     # 生成热点词汇统计部分的HTML
     stats_html = ""

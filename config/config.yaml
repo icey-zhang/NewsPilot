@@ -71,7 +71,7 @@ rss:
   #    - 只有新鲜的文章会被推送到通知渠道
   freshness_filter:
     enabled: true                     # 是否启用新鲜度过滤（默认启用）
-    max_age_days: 14                   # 最大文章年龄（天）
+    max_age_days: 7                   # 最大文章年龄（天）
                                       # - 正整数：只推送 N 天内的文章
                                       # - 0：禁用过滤，推送所有文章
 
@@ -120,7 +120,10 @@ rss:
     - id: "liangziwei"
       name: "量子位"
       url: "https://raw.githubusercontent.com/osnsyc/Wechat-Scholar/main/channels/gh_114e76fd6e5d.xml"
-    
+
+    - id: "jishipingtai"
+      name: "极市平台"
+      url: "https://raw.githubusercontent.com/osnsyc/Wechat-Scholar/main/channels/gh_3bb902f05720.xml"
 
 # ===============================================================
 # 3.5 LLM 富化（可选）
@@ -135,18 +138,23 @@ rss:
 llm:
   enabled: true
   # base_url 可以填写到根（如 https://api.openai.com），也可以直接填写到 /v1（如 http://host:port/v1）
-  # base_url: "http://119.8.241.85:59808/v1"
-  # api_key: "sk-aios12#$"
-  # model: "gpt-5.2"
-  base_url: "http://127.0.0.1:8045/v1"
-  api_key: "sk-382b7bc1be1f4148a0f4ee90afa56d13"
-  model: "gemini-3.1-pro-high"  
+  # base_url: "http://your-proxy-host:port/v1"
+  # api_key: "your-api-key"
+  # model: "minimax-m2.5"
+  # base_url: "https://ark.cn-beijing.volces.com/api/v3"
+  # api_key: "your-volc-api-key"
+  # model: "ep-xxxxxxxxxxxxxxxxx-xxxxx"
+
   # model: "gemini-3-flash-preview"
   # model: "gemini-3-pro-preview-nothinking"
-  
+
+  base_url: "http://127.0.0.1:8317/v1"
+  api_key: "your-api-key"              # ⚠️ 建议改用环境变量 TREND_LLM_API_KEY
+  model: "gemini-3.1-pro-high"
+
   # model: "qwen3-max"
   # base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
-  # api_key: "sk-f3bdc2bc640743869ac68d5ac2c9a8ad"
+  # api_key: "your-dashscope-api-key"
   # timeout: 1500
   # 默认富化任务（当 MCP 调用不方便传 llm_tasks 时使用）
   # 可选：summary / classify / cluster / item_enrich
@@ -261,9 +269,9 @@ notification:
       chat_id: ""                     # Telegram Chat ID
 
     email:
-      from: "851283222@qq.com"                        # 发件人邮箱地址
-      password: "oldxlucatkdebdcd"                    # 发件人邮箱密码或授权码
-      to: "851283222@qq.com"                          # 收件人邮箱，多个用逗号分隔
+      from: ""                        # 发件人邮箱地址
+      password: ""                    # 发件人邮箱密码或授权码
+      to: ""                          # 收件人邮箱，多个用逗号分隔
       smtp_server: ""                 # SMTP 服务器（可选，留空自动识别）
       smtp_port: ""                   # SMTP 端口（可选，留空自动识别）
 

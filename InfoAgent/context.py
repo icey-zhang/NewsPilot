@@ -319,6 +319,26 @@ class AppContext:
         rss_new_items: Optional[List[Dict]] = None,
     ) -> str:
         """渲染HTML内容"""
+        os_ai_top_items = None
+        os_ai_key_point = ""
+        try:
+            from InfoAgent.storage.llm_store import get_latest_llm_run
+
+            run = get_latest_llm_run(
+                output_dir="output",
+                date=self.format_date(),
+                kind="rss_item_os_ai_rank",
+            )
+            payload = run.get("payload") if isinstance(run, dict) else None
+            if isinstance(payload, dict):
+                top_items = payload.get("top_items")
+                if isinstance(top_items, list) and top_items:
+                    os_ai_top_items = top_items
+                os_ai_key_point = (payload.get("key_point_35") or "").strip()
+        except Exception:
+            os_ai_top_items = None
+            os_ai_key_point = ""
+
         return render_html_content(
             report_data=report_data,
             total_titles=total_titles,
@@ -333,6 +353,8 @@ class AppContext:
             display_mode=self.display_mode,
             hide_rss_without_llm=bool(self.config.get("HIDE_RSS_WITHOUT_LLM", False))
             and bool((self.config.get("LLM") or {}).get("ENABLED", False)),
+            os_ai_top_items=os_ai_top_items,
+            os_ai_key_point=os_ai_key_point,
         )
 
     # === 通知内容渲染 ===

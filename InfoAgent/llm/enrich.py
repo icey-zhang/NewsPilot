@@ -455,7 +455,258 @@ def enrich_rss_and_persist(
         result["rss_item_enrich_db_path"] = db_path
         result["rss_item_enrich_by_url"] = mapped
 
+        # 为 OS + AI 相关度自动挑选 TopK 条目
+        try:
+            ranking = rank_rss_items_for_os_ai(
+                client=client,
+                date=date,
+                rss_items=rss_items,
+                enriched_by_url=mapped,
+                top_k=3,
+            )
+            if ranking:
+                result["rss_item_os_ai_rank"] = ranking
+                db_path2 = save_llm_run(
+                    output_dir="output",
+                    date=date,
+                    kind="rss_item_os_ai_rank",
+                    model=ranking.get("model", client.model),
+                    payload=ranking,
+                )
+                print(f"[LLM] OS+AI 排序结果已保存: {db_path2}")
+        except Exception as e:
+            print(f"[LLM] OS+AI 排序步骤失败，已跳过: {e}")
+
     return result if len(result) > 2 else None
+
+
+_RANK_BATCH_SIZE = 5
+_RANK_TIMEOUT = int(__import__("os").environ.get("TREND_LLM_RANK_TIMEOUT") or 300)
+
+
+def _load_os_ai_score_cache(output_dir: str, date: str):
+    # 从当天已有的 rss_item_os_ai_rank 结果中加载已打分的 URL -> score_info
+    from InfoAgent.storage.llm_store import get_latest_llm_run
+    from InfoAgent.utils.url import normalize_rss_url_key
+    cached_run = get_latest_llm_run(output_dir=output_dir, date=date, kind="rss_item_os_ai_rank")
+    if not cached_run:
+        return {}
+    ranked_items = (cached_run.get("payload") or {}).get("ranked_items") or []
+    cache = {}
+    for item in ranked_items:
+        url = (item.get("url") or "").strip()
+        if not url:
+            continue
+        cache[normalize_rss_url_key(url)] = {
+            "url": url,
+            "score_os_relevance": item.get("score_os_relevance", 0),
+            "score_ai_relevance": item.get("score_ai_relevance", 0),
+            "score_novelty": item.get("score_novelty", 0),
+            "comment": item.get("comment", ""),
+        }
+    return cache
+
+
+def _score_items_batch(client, system: str, batch):
+    # 对一批条目打分，返回 {url_key: score_info} 字典
+    schema_hint = {
+        "items": [
+            {
+                "url": "string",
+                "score_os_relevance": "int (0-10)",
+                "score_ai_relevance": "int (0-10)",
+                "score_novelty": "int (0-10)",
+                "comment": "string",
+            }
+        ],
+    }
+
+    prompt_lines = ["\u8bf7\u4e3a\u4e0b\u9762\u6bcf\u6761\u8d44\u8baf\u6253\u5206\uff0c\u5e76\u8f93\u51fa JSON\uff1a", ""]
+    for idx, it in enumerate(batch, start=1):
+        prompt_lines.append(str(idx) + ". \u6807\u9898: " + it["title"])
+        if it["summary"]:
+            prompt_lines.append("   \u6458\u8981: " + it["summary"])
+        if it["viewpoint"]:
+            prompt_lines.append("   \u89c2\u70b9: " + it["viewpoint"])
+        prompt_lines.append("   URL: " + it["url"])
+        prompt_lines.append("")
+    prompt_lines.append(
+        "\u8bf7\u8f93\u51fa\u5982\u4e0b\u683c\u5f0f\u7684 JSON:\n"
+        '{"items":[{"url":"...","score_os_relevance":0-10,'
+        '"score_ai_relevance":0-10,"score_novelty":0-10,"comment":"..."}]}'
+    )
+    user = "\n".join(prompt_lines)
+
+    resp = client.chat_json(
+        system=system,
+        user=user,
+        json_schema_hint=schema_hint,
+        temperature=0.1,
+    )
+
+    from InfoAgent.utils.url import normalize_rss_url_key
+    result = {}
+    for s in (resp.get("json") or {}).get("items") or []:
+        if not isinstance(s, dict):
+            continue
+        url = (s.get("url") or "").strip()
+        if not url:
+            continue
+        result[normalize_rss_url_key(url)] = s
+    return result
+
+
+def _generate_key_point_35(client, top_items):
+    # 对已选出的 top_k 条生成不超过 35 汉字的整体概括
+    prompt_lines = ["\u8bf7\u5bf9\u4ee5\u4e0b\u51e0\u6761\u8d44\u8baf\u505a\u6574\u4f53\u6982\u62ec\uff08\u4e0d\u8d85\u8fc735\u4e2a\u6c49\u5b57\uff0c\u5c3d\u91cf\u4e0d\u7528\u6807\u70b9\uff09\uff1a", ""]
+    for idx, it in enumerate(top_items, start=1):
+        prompt_lines.append(str(idx) + ". " + it.get("title", ""))
+        if it.get("comment"):
+            prompt_lines.append("   \u63a8\u8350\u7406\u7531: " + it["comment"])
+        prompt_lines.append("")
+    prompt_lines.append("\u76f4\u63a5\u8f93\u51fa\u6982\u62ec\u6587\u5b57\uff0c\u4e0d\u9700\u8981 JSON \u5305\u88c5\u3002")
+    user = "\n".join(prompt_lines)
+
+    resp = client.chat_json(
+        system=(
+            "\u4f60\u662f\u4e00\u4e2a\u8d44\u6df1\u64cd\u4f5c\u7cfb\u7edf\u5de5\u7a0b\u5e08\u517c AI \u7814\u7a76\u5458\u3002"
+            "\u8bf7\u7528\u4e0d\u8d85\u8fc735\u4e2a\u6c49\u5b57\u5bf9\u7ed9\u5b9a\u8d44\u8baf\u505a\u6574\u4f53\u6982\u62ec\uff0c\u8a00\u7b80\u610f\u8d45\uff0c\u5c3d\u91cf\u4e0d\u7528\u6807\u70b9\u3002"
+            "\u76f4\u63a5\u8f93\u51fa\u7eaf\u6587\u672c\uff0c\u4e0d\u8981\u5305\u542b JSON \u6216\u591a\u4f59\u683c\u5f0f\u3002"
+        ),
+        user=user,
+        temperature=0.1,
+    )
+    raw = (resp.get("raw") or "").strip()
+    parsed = resp.get("json") or {}
+    return (parsed.get("key_point_35") or parsed.get("value") or raw or "").strip()
+
+
+def rank_rss_items_for_os_ai(
+    *,
+    client,
+    date: str,
+    rss_items,
+    enriched_by_url,
+    top_k: int = 3,
+):
+    """
+    使用 LLM 从 AI + OS 相关度角度为 RSS 条目打分，并选出 TopK。
+    - 批次大小 _RANK_BATCH_SIZE，超时 _RANK_TIMEOUT 秒
+    - 已打分的 URL 从当天缓存加载，跳过重复打分
+    """
+    from InfoAgent.utils.url import normalize_rss_url_key
+    from InfoAgent.llm.openai_compat import OpenAICompatClient
+    if not rss_items or not enriched_by_url:
+        return None
+
+    # 使用更长超时的独立客户端
+    rank_client = OpenAICompatClient(
+        base_url=client.base_url,
+        api_key=client.api_key,
+        model=client.model,
+        timeout=_RANK_TIMEOUT,
+    )
+
+    items = sorted(rss_items, key=lambda x: x.get("published_at", ""), reverse=True)
+
+    payload_items = []
+    for it in items:
+        url = (it.get("url") or "").strip()
+        if not url:
+            continue
+        key = normalize_rss_url_key(url)
+        enriched = enriched_by_url.get(key) or {}
+        payload_items.append(
+            {
+                "url": url,
+                "title": (enriched.get("title") or it.get("title") or "").strip(),
+                "summary": (enriched.get("summary") or "").strip(),
+                "viewpoint": (enriched.get("viewpoint") or "").strip(),
+            }
+        )
+
+    if not payload_items:
+        return None
+
+    # 加载当天已有的打分缓存，跳过已打分的 URL
+    score_cache = _load_os_ai_score_cache(output_dir="output", date=date)
+    hit_count = sum(1 for it in payload_items if normalize_rss_url_key(it["url"]) in score_cache)
+    miss_items = [it for it in payload_items if normalize_rss_url_key(it["url"]) not in score_cache]
+    if hit_count:
+        print(f"[LLM] OS+AI \u6392\u5e8f\u7f13\u5b58\u547d\u4e2d {hit_count} \u6761\uff0c\u5f85\u6253\u5206 {len(miss_items)} \u6761")
+
+    system = (
+        "\u4f60\u662f\u4e00\u4e2a\u8d44\u6df1\u64cd\u4f5c\u7cfb\u7edf\u5de5\u7a0b\u5e08\u517c AI \u7814\u7a76\u5458\uff0c\u8d1f\u8d23\u5e2e\u7528\u6237\u6311\u9009\u672c\u5468\u6700\u503c\u5f97\u5173\u6ce8\u7684 AI \u8d44\u8baf\u3002"
+        "\u8bf7\u4ece\u201c\u662f\u5426\u80fd\u7ed9\u64cd\u4f5c\u7cfb\u7edf\u8bbe\u8ba1/\u5b9e\u73b0\u5e26\u6765\u542f\u53d1\u201d\u8fd9\u4e2a\u89d2\u5ea6\u8fdb\u884c\u8bc4\u4ef7\uff0c"
+        "\u5c24\u5176\u5173\u6ce8\uff1a\u7cfb\u7edf\u67b6\u6784\u3001\u8d44\u6e90\u8c03\u5ea6\u3001\u6027\u80fd\u4f18\u5316\u3001\u5185\u5b58/\u5b58\u50a8\u3001\u865a\u62df\u5316\u3001\u5bb9\u5668\u3001\u7f16\u8bd1\u4e0e\u8fd0\u884c\u65f6\u3001\u7cfb\u7edf\u5b89\u5168\u7b49\u3002"
+        "\u540c\u65f6\uff0c\u65b0\u7684\u5927\u6a21\u578b\u3001\u63a8\u7406\u6846\u67b6\u6216\u786c\u4ef6\u5bf9\u7cfb\u7edf\u6808\u4ea7\u751f\u5f71\u54cd\u7684\u5185\u5bb9\u4e5f\u7b97\u6709\u4ef7\u503c\u3002"
+        "\u8bf7\u4e25\u683c\u6309\u7167\u6307\u5b9a JSON \u683c\u5f0f\u8f93\u51fa\uff0c\u4e0d\u8981\u5305\u542b\u591a\u4f59\u6587\u5b57\u3002"
+    )
+
+    # 分批打分（只处理未命中缓存的条目）
+    new_scores = {}
+    total_batches = (len(miss_items) + _RANK_BATCH_SIZE - 1) // _RANK_BATCH_SIZE if miss_items else 0
+    for batch_idx in range(total_batches):
+        batch = miss_items[batch_idx * _RANK_BATCH_SIZE: (batch_idx + 1) * _RANK_BATCH_SIZE]
+        print(f"[LLM] OS+AI \u6392\u5e8f batch {batch_idx + 1}/{total_batches}\uff08{len(batch)} \u6761\uff09")
+        batch_scores = _score_items_batch(rank_client, system, batch)
+        new_scores.update(batch_scores)
+
+    # 合并缓存 + 新打分
+    score_by_url = {**score_cache, **new_scores}
+
+    # 汇总打分、计算综合得分
+    ranked = []
+    for it in payload_items:
+        key = normalize_rss_url_key(it["url"])
+        score_info = score_by_url.get(key) or {}
+
+        try:
+            score_os = int(score_info.get("score_os_relevance") or 0)
+        except Exception:
+            score_os = 0
+        try:
+            score_ai = int(score_info.get("score_ai_relevance") or 0)
+        except Exception:
+            score_ai = 0
+        try:
+            score_novelty = int(score_info.get("score_novelty") or 0)
+        except Exception:
+            score_novelty = 0
+
+        final_score = 0.4 * score_os + 0.4 * score_ai + 0.2 * score_novelty
+
+        ranked.append(
+            {
+                **it,
+                "score_os_relevance": score_os,
+                "score_ai_relevance": score_ai,
+                "score_novelty": score_novelty,
+                "final_score": final_score,
+                "comment": (score_info.get("comment") or "").strip(),
+            }
+        )
+
+    if not ranked:
+        return None
+
+    ranked.sort(key=lambda x: x["final_score"], reverse=True)
+    top_items = ranked[: max(1, top_k)]
+
+    # 用 top_k 条单独生成整体概括
+    key_point_35 = ""
+    try:
+        key_point_35 = _generate_key_point_35(rank_client, top_items)
+    except Exception as e:
+        print(f"[LLM] key_point_35 \u751f\u6210\u5931\u8d25\uff0c\u5df2\u8df3\u8fc7: {e}")
+
+    return {
+        "date": date,
+        "model": rank_client.model,
+        "ranked_items": ranked,
+        "top_items": top_items,
+        "key_point_35": key_point_35,
+    }
 
 
 def _build_rss_prompt(*, rss_items: List[Dict[str, Any]], tasks: List[str]) -> str:
@@ -618,3 +869,110 @@ def _debug_dump_text(*, tag: str, text: str) -> str:
     path.write_text(text, encoding="utf-8")
     print(f"[LLM][DEBUG] dumped: {path}")
     return str(path)
+
+
+def enrich_article(
+    *,
+    url: str = "",
+    title: str = "",
+    content: str = "",
+    date: str = "",
+    output_dir: str = "output",
+) -> dict:
+    """
+    对单篇文章做「标题 + 总结 + 观点」富化。
+    复用 config.yaml 中的 llm 配置和 fulltext 配置。
+
+    参数:
+        url     : 文章链接（传入后自动抓取正文，除非同时传了 content）
+        title   : 原始标题（可选，有助于 LLM 理解文章）
+        content : 文章正文（可选，传入则跳过网络抓取）
+        date    : 日期字符串（默认今天，用于归档到 output/llm/{date}.db）
+        output_dir: 输出目录，默认 output
+
+    返回:
+        {"url": ..., "title": ..., "summary": ..., "viewpoint": ..., "model": ..., "db_path": ...}
+    """
+    import os
+    from datetime import datetime
+
+    from InfoAgent.core import load_config
+    from InfoAgent.llm.openai_compat import OpenAICompatClient
+    from InfoAgent.llm.fulltext import FullTextConfig, fetch_article_text
+    from InfoAgent.llm.prompt import build_rss_item_enrich_prompt
+    from InfoAgent.storage.llm_store import save_llm_run
+
+    if not url and not content:
+        raise ValueError("url 和 content 至少提供一个")
+
+    if not date:
+        date = datetime.now().strftime("%Y-%m-%d")
+
+    # 加载配置
+    config = load_config()
+    llm_cfg = config.get("LLM") or {}
+
+    base_url = os.environ.get("TREND_LLM_BASE_URL") or os.environ.get("OPENAI_BASE_URL") or llm_cfg.get("BASE_URL")
+    api_key = os.environ.get("TREND_LLM_API_KEY") or os.environ.get("OPENAI_API_KEY") or llm_cfg.get("API_KEY")
+    model = os.environ.get("TREND_LLM_MODEL") or llm_cfg.get("MODEL")
+    timeout = int(os.environ.get("TREND_LLM_TIMEOUT") or llm_cfg.get("TIMEOUT") or 90)
+
+    client = OpenAICompatClient(base_url=base_url, api_key=api_key, model=model, timeout=timeout)
+
+    # 全文抓取（仅当未传 content 且 url 有效时）
+    if not content and url:
+        ft_cfg_raw = llm_cfg.get("FULLTEXT") if isinstance(llm_cfg, dict) else {}
+        ft_cfg = FullTextConfig(
+            enabled=True,
+            timeout=int(ft_cfg_raw.get("TIMEOUT", 15) or 15) if isinstance(ft_cfg_raw, dict) else 15,
+            max_bytes=int(ft_cfg_raw.get("MAX_BYTES", 1200000) or 1200000) if isinstance(ft_cfg_raw, dict) else 1200000,
+            max_chars=int(ft_cfg_raw.get("MAX_CHARS", 60000) or 60000) if isinstance(ft_cfg_raw, dict) else 60000,
+            min_paragraph_chars=int(ft_cfg_raw.get("MIN_PARAGRAPH_CHARS", 60) or 60) if isinstance(ft_cfg_raw, dict) else 60,
+            use_proxy=bool(ft_cfg_raw.get("USE_PROXY", False)) if isinstance(ft_cfg_raw, dict) else False,
+            proxy_url=(ft_cfg_raw.get("PROXY_URL", "") or "").strip() if isinstance(ft_cfg_raw, dict) else "",
+        )
+        fetched = fetch_article_text(url, ft_cfg)
+        if fetched and len(fetched) >= 100:
+            content = fetched
+            print(f"[enrich-article] 全文抓取成功，字符数: {len(content)}")
+        else:
+            print("[enrich-article] 全文抓取失败或内容过短，仅凭标题/URL 做总结")
+
+    item = {"url": url, "title": title, "content": content}
+    system, user, schema_hint = build_rss_item_enrich_prompt(
+        item=item,
+        include_content=bool(content),
+        language="zh",
+    )
+
+    print(f"[enrich-article] 调用 LLM（model={client.model}）...")
+    resp = client.chat_json(system=system, user=user, json_schema_hint=schema_hint, temperature=0.2)
+
+    data = resp.get("json") or {}
+    result = {
+        "url": url,
+        "title": (data.get("title") or title or "").strip(),
+        "summary": (data.get("summary") or "").strip(),
+        "viewpoint": (data.get("viewpoint") or "").strip(),
+        "model": resp.get("model", client.model),
+    }
+
+    # 保存到当天 DB
+    db_path = save_llm_run(
+        output_dir=output_dir,
+        date=date,
+        kind="article_enrich",
+        model=result["model"],
+        payload={
+            "date": date,
+            "url": url,
+            "input_title": title,
+            "has_fulltext": bool(content),
+            "result": result,
+        },
+    )
+    result["db_path"] = db_path
+    print(f"[enrich-article] 结果已保存: {db_path}")
+    return result
+
+
