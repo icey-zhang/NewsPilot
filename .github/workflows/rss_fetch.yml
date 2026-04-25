@@ -31,11 +31,24 @@ jobs:
 
       - name: Export RSS items for Claude analysis
         run: |
-          uv run python -m NewsPilot llm.agent_enrich fetch \
-            --date "$(date +%Y-%m-%d)" \
-            > output/rss_items_for_enrich.json
-          echo "📋 导出完成，条目数："
-          python3 -c "import json; d=json.load(open('output/rss_items_for_enrich.json')); print(d.get('total_count', 0))"
+          mkdir -p output
+          # 直接在 Python 内写文件，避免初始化 print 输出污染 JSON
+          uv run python - <<'EOF'
+          import json, sys, os
+          from datetime import datetime
+          os.chdir(os.environ.get("GITHUB_WORKSPACE", "."))
+          from NewsPilot.llm.agent_enrich import get_rss_items_for_agent
+          date = datetime.utcnow().strftime("%Y-%m-%d")
+          result = get_rss_items_for_agent(date=date)
+          out_path = "output/rss_items_for_enrich.json"
+          with open(out_path, "w", encoding="utf-8") as f:
+              json.dump(result, f, ensure_ascii=False, indent=2)
+          count = result.get("total_count", 0)
+          print(f"📋 导出完成，条目数：{count}，文件：{out_path}")
+          if count == 0:
+              err = result.get("error", "")
+              print(f"⚠️  无数据: {err}", file=sys.stderr)
+          EOF
 
       - name: Upload RSS data artifact
         uses: actions/upload-artifact@v4
