@@ -114,12 +114,13 @@ def render_html_content(
             }
 
             .save-buttons {
-                position: absolute;
-                top: 20px;
-                right: 20px;
                 display: flex;
+                flex-wrap: wrap;
                 gap: 10px;
-                z-index: 10;
+                justify-content: center;
+                padding: 14px 20px;
+                background: rgba(255, 255, 255, 0.06);
+                border-bottom: 1px solid rgba(255, 255, 255, 0.08);
             }
 
             .save-btn {
@@ -752,14 +753,8 @@ def render_html_content(
                 .header-info { grid-template-columns: 1fr 1fr; }
                 .content { padding: 20px; }
                 
-            .save-buttons {
-                position: static;
-                flex-direction: column;
-                margin-bottom: 20px;
-            }
-                
-                .save-btn {
-                    width: 100%;
+            .save-btn {
+                    flex: 1 1 auto;
                     justify-content: center;
                     background: rgba(255, 255, 255, 0.2);
                 }
@@ -773,13 +768,6 @@ def render_html_content(
     <body>
         <div class="container">
             <div class="header">
-                <div class="save-buttons">
-                    <button class="save-btn" onclick="saveAsImage()">保存为图片</button>
-                    <button class="save-btn" onclick="saveAsMultipleImages()">分段保存</button>
-                    <button class="save-btn" id="iaToggleSelectBtn" onclick="toggleSelectionMode()">选择资讯</button>
-                    <button class="save-btn" id="iaClearSelectBtn" onclick="clearSelections()" disabled>清空选择</button>
-                    <button class="save-btn" id="iaExportWeeklyBtn" onclick="exportWeeklyDigest()" disabled>生成周报</button>
-                </div>
                 <div class="header-title">热点新闻分析</div>
                 <div class="header-info">
                     <div class="info-item">
@@ -829,6 +817,14 @@ def render_html_content(
     html += """</span>
                     </div>
                 </div>
+            </div>
+
+            <div class="save-buttons">
+                <button class="save-btn" onclick="saveAsImage()">保存为图片</button>
+                <button class="save-btn" onclick="saveAsMultipleImages()">分段保存</button>
+                <button class="save-btn" id="iaToggleSelectBtn" onclick="toggleSelectionMode()">选择资讯</button>
+                <button class="save-btn" id="iaClearSelectBtn" onclick="clearSelections()" disabled>清空选择</button>
+                <button class="save-btn" id="iaExportWeeklyBtn" onclick="exportWeeklyDigest()" disabled>生成周报</button>
             </div>
 
             <div class="content">"""
