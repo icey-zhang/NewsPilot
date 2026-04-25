@@ -118,9 +118,9 @@ def render_html_content(
                 flex-wrap: wrap;
                 gap: 10px;
                 justify-content: center;
-                padding: 14px 20px;
-                background: rgba(255, 255, 255, 0.06);
-                border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+                padding: 12px 20px;
+                background: var(--primary-gradient);
+                border-top: 1px solid rgba(255, 255, 255, 0.15);
             }
 
             .save-btn {
