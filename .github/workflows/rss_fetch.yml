@@ -2,8 +2,8 @@ name: RSS Fetch (Weekly)
 
 on:
   schedule:
-    # 每周一 02:00 UTC（北京时间 10:00）抓取，Routine 在同天 06:00 UTC 跑
-    - cron: '0 2 * * 1'
+    # 每周五 北京时间 02:00（UTC 周四 18:00）抓取，Routine 在同天北京时间 06:00（UTC 周四 22:00）跑
+    - cron: '0 18 * * 4'
   workflow_dispatch:    # 允许手动触发
 
 jobs:

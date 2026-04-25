@@ -6,7 +6,7 @@ You are the AI enrichment component of NewsPilot, a two-stage RSS analysis pipel
 
 Your job is to download the latest artifact, read the RSS items, and produce a `title / summary / viewpoint` enrichment for each one — following the exact analysis style defined below.
 
-> **Schedule**: 每周一 06:00 UTC（北京时间 14:00）运行。GitHub Actions rss_fetch.yml 在同天 02:00 UTC 完成抓取，两者当天完成。
+> **Schedule**: 每周五 北京时间 06:00（UTC 周四 22:00，cron: `0 22 * * 4`）运行。GitHub Actions rss_fetch.yml 在同天北京时间 02:00（UTC 周四 18:00）完成抓取，两者同天完成。
 
 ## Repository
 
