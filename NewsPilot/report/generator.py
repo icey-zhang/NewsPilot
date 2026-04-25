@@ -189,7 +189,7 @@ def generate_html_report(
         elif mode == "incremental":
             filename = "当日增量.html"
         else:
-            filename = "当日汇总.html"
+            filename = "index.html"
     else:
         filename = f"{time_filename}.html"
 
@@ -239,7 +239,7 @@ def generate_html_report(
     # 生成历史页面（不影响主流程）
     if is_daily_summary and enable_history_page:
         try:
-            generate_history_pages(output_dir=output_dir, daily_filename="当日汇总.html")
+            generate_history_pages(output_dir=output_dir, daily_filename="index.html")
         except Exception as e:
             # 历史页面属于附加功能，生成失败不应影响主报告输出
             print(f"[History] 生成历史页面失败: {e}")

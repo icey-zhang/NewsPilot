@@ -6,4 +6,5 @@ history.html
 config/config.yaml.local
 .vscode/
 index.html
+!docs/index.html
 .claude/
