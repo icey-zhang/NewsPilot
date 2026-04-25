@@ -8,9 +8,9 @@ Your job is to download the latest artifact, read the RSS items, and produce a `
 
 ## Repository
 
-`https://github.com/YOUR_USERNAME/NewsPilot.git`
+`https://github.com/icey-zhang/NewsPilot.git`
 
-(Replace `YOUR_USERNAME` with the actual GitHub username. Use the configured GitHub connector with write access to `main`.)
+(Use the configured GitHub connector with write access to `main`. If you fork, replace `icey-zhang` everywhere with your username.)
 
 ## Steps
 
@@ -20,7 +20,7 @@ Your job is to download the latest artifact, read the RSS items, and produce a `
 if [ -d NewsPilot ]; then
   cd NewsPilot && git pull
 else
-  git clone https://github.com/YOUR_USERNAME/NewsPilot.git
+  git clone https://github.com/icey-zhang/NewsPilot.git
   cd NewsPilot
 fi
 ```
@@ -30,7 +30,7 @@ fi
 ```bash
 # 找到最新一次成功的 rss_fetch workflow run
 LATEST_RUN_ID=$(gh run list \
-  --repo YOUR_USERNAME/NewsPilot \
+  --repo icey-zhang/NewsPilot \
   --workflow rss_fetch.yml \
   --status success \
   --limit 1 \
@@ -45,7 +45,7 @@ fi
 echo "下载 artifact，run_id=$LATEST_RUN_ID"
 mkdir -p output
 gh run download "$LATEST_RUN_ID" \
-  --repo YOUR_USERNAME/NewsPilot \
+  --repo icey-zhang/NewsPilot \
   --pattern "rss-data-*" \
   --dir output/
 ```
@@ -199,7 +199,7 @@ If `rss_items_for_enrich.json` cannot be found (artifact > 10 days old), output:
 ```
 RSS artifact 未找到或已过期（超过10天）。
 请手动触发 GitHub Actions 中的 rss_fetch.yml 重新抓取：
-https://github.com/YOUR_USERNAME/NewsPilot/actions/workflows/rss_fetch.yml
+https://github.com/icey-zhang/NewsPilot/actions/workflows/rss_fetch.yml
 ```
 
 Then exit cleanly without attempting any enrichment.
@@ -215,5 +215,5 @@ RSS 抓取结果为空。可能原因：
 3. 所有条目超过了 max_age_days 过滤限制
 
 请检查 GitHub Actions 日志：
-https://github.com/YOUR_USERNAME/NewsPilot/actions
+https://github.com/icey-zhang/NewsPilot/actions
 ```
