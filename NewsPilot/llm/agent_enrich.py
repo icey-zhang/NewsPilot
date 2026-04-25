@@ -40,6 +40,8 @@ def get_rss_items_for_agent(date: Optional[str] = None) -> Dict[str, Any]:
             "enrichment_prompt": str  # Instructions for Agent
         }
     """
+    from NewsPilot.utils.time import get_configured_time, is_within_days, DEFAULT_TIMEZONE
+
     storage = _get_storage_manager()
     target_date = date or datetime.now().strftime("%Y-%m-%d")
 
@@ -47,11 +49,28 @@ def get_rss_items_for_agent(date: Optional[str] = None) -> Dict[str, Any]:
     if not rss_data:
         return {"date": target_date, "items": [], "error": "No RSS data found"}
 
-    # Convert RSSData to simple list
+    # Read max_age_days from config (RSS.freshness_filter.max_age_days, default 7)
+    try:
+        cfg = _load_config()
+        rss_cfg = cfg.get("RSS") or cfg.get("rss") or {}
+        freshness_cfg = rss_cfg.get("freshness_filter") or {}
+        max_age_days: int = int(freshness_cfg.get("max_age_days") or 7)
+        tz_name: str = (cfg.get("app") or {}).get("timezone") or DEFAULT_TIMEZONE
+    except Exception:
+        max_age_days = 7
+        tz_name = DEFAULT_TIMEZONE
+
+    # Convert RSSData to simple list, applying published_at freshness filter
     items: List[Dict[str, Any]] = []
+    skipped = 0
     for feed_id, rss_list in rss_data.items.items():
         feed_name = rss_data.id_to_name.get(feed_id, feed_id)
         for item in rss_list:
+            # Skip items older than max_age_days (same logic as push-stage filter)
+            if max_age_days > 0 and item.published_at:
+                if not is_within_days(item.published_at, max_age_days, tz_name):
+                    skipped += 1
+                    continue
             items.append({
                 "url": item.url,
                 "title": item.title,
@@ -60,7 +79,10 @@ def get_rss_items_for_agent(date: Optional[str] = None) -> Dict[str, Any]:
                 "published_at": item.published_at,
             })
 
-    # Sort by published_at descending; no hard cap (full 7-day window kept).
+    if skipped:
+        print(f"[agent_enrich] 新鲜度过滤：跳过 {skipped} 篇超过 {max_age_days} 天的旧文章")
+
+    # Sort by published_at descending
     items = sorted(items, key=lambda x: x.get("published_at", ""), reverse=True)
 
     enrichment_prompt = """
