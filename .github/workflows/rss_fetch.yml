@@ -6,6 +6,9 @@ on:
     - cron: '0 18 * * 4'
   workflow_dispatch:    # 允许手动触发
 
+permissions:
+  contents: write   # 允许 commit + push data/rss/
+
 jobs:
   fetch:
     runs-on: ubuntu-latest
@@ -31,7 +34,7 @@ jobs:
 
       - name: Export RSS items (with fulltext) for Claude analysis
         run: |
-          mkdir -p output
+          mkdir -p data/rss output
           uv run python - <<'EOF'
           import json, sys
           from datetime import datetime
@@ -83,27 +86,34 @@ jobs:
           result["fulltext_failed"] = failed
 
           # 4. 写文件
-          out_path = "output/rss_items_for_enrich.json"
+          out_path = "data/rss/rss_items_for_enrich.json"
           with open(out_path, "w", encoding="utf-8") as f:
               json.dump(result, f, ensure_ascii=False, indent=2)
 
           print(f"导出完成: {len(items)} 条，全文成功 {ok}，失败/空 {failed}")
           EOF
 
-      - name: Upload RSS data artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: rss-data-${{ github.run_id }}
-          path: output/
-          # 同天完成，保留 1 天即可
-          retention-days: 1
+      - name: Commit RSS data to main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/rss/rss_items_for_enrich.json
+          if git diff --staged --quiet; then
+            echo "No changes to commit (data unchanged)"
+          else
+            DATE=$(date -u +%Y-%m-%d)
+            COUNT=$(python3 -c "import json; print(json.load(open('data/rss/rss_items_for_enrich.json'))['total_count'])")
+            git commit -m "data(rss): refresh ${DATE} (${COUNT} items)"
+            git pull --rebase origin main
+            git push origin main
+            echo "已 commit + push 到 main"
+          fi
 
       - name: Summary
         run: |
           echo "## RSS 抓取完成" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- 运行时间：$(date -u '+%Y-%m-%d %H:%M UTC')" >> $GITHUB_STEP_SUMMARY
-          echo "- Artifact 名称：\`rss-data-${{ github.run_id }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- 保留天数：10 天" >> $GITHUB_STEP_SUMMARY
+          echo "- 数据文件：\`data/rss/rss_items_for_enrich.json\`（已 commit 到 main）" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "下一步：在本地运行 Claude Code Routine 完成 AI 富化分析。" >> $GITHUB_STEP_SUMMARY
+          echo "下一步：在 Routine 中 \`git pull\` 后读取该文件完成 AI 富化分析。" >> $GITHUB_STEP_SUMMARY

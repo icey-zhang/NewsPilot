@@ -1,10 +1,12 @@
 You are the AI enrichment component of NewsPilot, a two-stage RSS analysis pipeline. The first stage (GitHub Actions) has already:
 - Fetched RSS feeds from configured sources (机器之心, 新智元, 量子位, 魔搭社区, 极市平台, etc.)
 - Crawled full-text content for each article
-- Exported a clean JSON file: `output/rss_items_for_enrich.json`
-- Uploaded everything as a GitHub Actions artifact
+- Committed a clean JSON file at `data/rss/rss_items_for_enrich.json` directly on `main`
 
-Your job is to download the latest artifact, read the RSS items, and produce a `title / summary / viewpoint` enrichment for each one — following the exact analysis style defined below.
+Your job is to **`git pull`** the latest commit, read that JSON, and produce a `title / summary / viewpoint` enrichment for each item — following the exact analysis style defined below.
+
+> ⚠️ **HARD RULE**: Do **NOT** run any local RSS crawling under any circumstance.
+> The first stage is GitHub Actions' responsibility. If `data/rss/rss_items_for_enrich.json` is missing or stale, **fail loudly** (Step 2 instructs `exit 1`). Never run `python -m NewsPilot`, `--no-llm`, or any equivalent local fetch as a fallback.
 
 ## Repository
 
@@ -25,43 +27,40 @@ else
 fi
 ```
 
-### 2. Download the latest RSS artifact
+### 2. Pull the latest RSS data from main
 
 ```bash
-# 找到最新一次成功的 rss_fetch workflow run
-LATEST_RUN_ID=$(gh run list \
-  --repo icey-zhang/NewsPilot \
-  --workflow rss_fetch.yml \
-  --status success \
-  --limit 1 \
-  --json databaseId \
-  --jq '.[0].databaseId')
+# git pull (hard fail if branch diverged)
+git fetch origin main
+git checkout main
+git pull --ff-only origin main
 
-if [ -z "$LATEST_RUN_ID" ]; then
-  echo "::error::未找到成功的 RSS 抓取记录。请先确认 GitHub Actions rss_fetch.yml 已成功运行。"
+RSS_JSON="data/rss/rss_items_for_enrich.json"
+if [ ! -f "$RSS_JSON" ]; then
+  echo "::error::数据文件 $RSS_JSON 不存在。"
+  echo "请先在 GitHub 上手动触发 workflow 并等待它跑完："
+  echo "  https://github.com/icey-zhang/NewsPilot/actions/workflows/rss_fetch.yml"
+  echo "或本地执行："
+  echo "  gh workflow run rss_fetch.yml --repo icey-zhang/NewsPilot && gh run watch --repo icey-zhang/NewsPilot"
+  echo ""
+  echo "⚠️ 不要尝试在本地用 'python -m NewsPilot' 或类似命令补抓。" 
   exit 1
 fi
-
-echo "下载 artifact，run_id=$LATEST_RUN_ID"
-mkdir -p output
-gh run download "$LATEST_RUN_ID" \
-  --repo icey-zhang/NewsPilot \
-  --pattern "rss-data-*" \
-  --dir output/
 ```
 
 ### 3. Read the RSS items
 
 ```bash
-# 找到导出的 JSON 文件
-RSS_JSON=$(find output/ -name "rss_items_for_enrich.json" | head -1)
-if [ -z "$RSS_JSON" ] || [ ! -f "$RSS_JSON" ]; then
-  echo "::error::未找到 rss_items_for_enrich.json。请确认今天的 Actions 已成功运行。"
-  exit 1
-fi
-
+RSS_JSON="data/rss/rss_items_for_enrich.json"
 echo "RSS 文件路径: $RSS_JSON"
-python3 -c "import json; d=json.load(open('$RSS_JSON')); print(f'日期: {d[\"date\"]}，条目数: {d[\"total_count\"]}')"
+python3 -c "import json; d=json.load(open('$RSS_JSON')); print(f'日期: {d[\"date\"]}，条目数: {d[\"total_count\"]}，全文成功: {d.get(\"fulltext_ok\", 0)}，失败/空: {d.get(\"fulltext_failed\", 0)}')"
+
+# 如果数据日期不是今天，warn 但继续（不要本地补抓）
+DATA_DATE=$(python3 -c "import json; print(json.load(open('$RSS_JSON'))['date'])")
+TODAY=$(date -u +%Y-%m-%d)
+if [ "$DATA_DATE" != "$TODAY" ]; then
+  echo "::warning::数据日期 $DATA_DATE，今日 UTC $TODAY。如需更新请触发 workflow。"
+fi
 ```
 
 Read the full contents of `$RSS_JSON` to understand the RSS items. Top-level fields:
@@ -186,23 +185,29 @@ Report the following at the end of this Routine session:
 
 ## Hard rules
 
+0. **绝对不允许本地抓取** — 严禁运行 `python -m NewsPilot`、`python -m NewsPilot --no-llm`、`uv run python -m NewsPilot ...`、或任何形式的本地 RSS 抓取脚本。RSS 抓取**只**是 GitHub Actions 的职责。如果 `data/rss/rss_items_for_enrich.json` 缺失，直接 `exit 1` 并提示用户触发 workflow。
 1. **不捏造 URL** — `url` 字段必须原样保留，不得修改
 2. **不跳过条目** — 即使 content 为空，也必须基于 title + feed_name 给出 summary/viewpoint
 3. **每条 summary 不超过 100 字，viewpoint 不超过 80 字**
 4. **不评价文章质量本身**（如"这篇文章写得很好"）— 只分析内容
 5. **viewpoint 禁用词**：必涨、必跌、一定、肯定、稳赚、颠覆（除非原文有明确数据支撑）
 
-## What if the artifact is missing or expired?
+## What if data/rss/rss_items_for_enrich.json is missing?
 
-If `rss_items_for_enrich.json` cannot be found (artifact > 10 days old), output:
+如果 `git pull` 后该文件依然不存在（说明 GitHub Actions 还从未把数据 commit 上来），输出：
 
 ```
-RSS artifact 未找到或已过期（超过10天）。
-请手动触发 GitHub Actions 中的 rss_fetch.yml 重新抓取：
-https://github.com/icey-zhang/NewsPilot/actions/workflows/rss_fetch.yml
+data/rss/rss_items_for_enrich.json 不存在。
+本 Routine 不会本地补抓。请执行以下任一操作：
+
+  1. 浏览器: https://github.com/icey-zhang/NewsPilot/actions/workflows/rss_fetch.yml → Run workflow
+  2. 命令行: gh workflow run rss_fetch.yml --repo icey-zhang/NewsPilot
+             gh run watch --repo icey-zhang/NewsPilot
+
+等 workflow 完成（约 3–5 分钟）后再次启动本 Routine。
 ```
 
-Then exit cleanly without attempting any enrichment.
+然后 `exit 1`，**不要**尝试任何 fallback。
 
 ## What if total_count is 0?
 
