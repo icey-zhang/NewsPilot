@@ -29,25 +29,65 @@ jobs:
           # 关闭 LLM，只抓取 RSS + 全文内容
           NP_SKIP_LLM: "1"
 
-      - name: Export RSS items for Claude analysis
+      - name: Export RSS items (with fulltext) for Claude analysis
         run: |
           mkdir -p output
-          # 直接在 Python 内写文件，避免初始化 print 输出污染 JSON
           uv run python - <<'EOF'
-          import json, sys, os
+          import json, sys
           from datetime import datetime
-          os.chdir(os.environ.get("GITHUB_WORKSPACE", "."))
+
+          from NewsPilot.core import load_config
           from NewsPilot.llm.agent_enrich import get_rss_items_for_agent
+          from NewsPilot.llm.fulltext import FullTextConfig, fetch_article_text
+
           date = datetime.utcnow().strftime("%Y-%m-%d")
+
+          # 1. 读取 RSS 条目
           result = get_rss_items_for_agent(date=date)
+          items = result.get("items", [])
+          if not items:
+              print(f"WARNING: 无 RSS 数据: {result.get('error', '')}", file=sys.stderr)
+
+          # 2. 读取 fulltext 配置
+          config = load_config()
+          ft_raw = (config.get("LLM") or {}).get("FULLTEXT") or {}
+          ft_cfg = FullTextConfig(
+              enabled=True,
+              timeout=int(ft_raw.get("TIMEOUT", 15) or 15),
+              max_bytes=int(ft_raw.get("MAX_BYTES", 12000000) or 12000000),
+              max_chars=int(ft_raw.get("MAX_CHARS", 60000) or 60000),
+              min_paragraph_chars=int(ft_raw.get("MIN_PARAGRAPH_CHARS", 60) or 60),
+              request_interval_ms=int(ft_raw.get("REQUEST_INTERVAL_MS", 200) or 200),
+              use_proxy=False,
+              proxy_url="",
+          )
+          max_items = int(ft_raw.get("MAX_ITEMS", 200) or 200)
+
+          # 3. 逐条抓全文
+          ok, failed = 0, 0
+          for idx, item in enumerate(items[:max_items]):
+              url = item.get("url", "")
+              if not url:
+                  continue
+              content = fetch_article_text(url, ft_cfg)
+              if content and len(content) >= ft_cfg.min_paragraph_chars:
+                  item["content"] = content
+                  ok += 1
+              else:
+                  failed += 1
+              if (idx + 1) % 10 == 0:
+                  print(f"  进度 {idx+1}/{min(len(items), max_items)}，成功 {ok}，失败 {failed}")
+
+          result["items"] = items
+          result["fulltext_ok"] = ok
+          result["fulltext_failed"] = failed
+
+          # 4. 写文件
           out_path = "output/rss_items_for_enrich.json"
           with open(out_path, "w", encoding="utf-8") as f:
               json.dump(result, f, ensure_ascii=False, indent=2)
-          count = result.get("total_count", 0)
-          print(f"📋 导出完成，条目数：{count}，文件：{out_path}")
-          if count == 0:
-              err = result.get("error", "")
-              print(f"⚠️  无数据: {err}", file=sys.stderr)
+
+          print(f"导出完成: {len(items)} 条，全文成功 {ok}，失败/空 {failed}")
           EOF
 
       - name: Upload RSS data artifact
