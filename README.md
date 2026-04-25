@@ -1,111 +1,268 @@
-# InfoAgent
+# NewsPilot - AI 驱动的新闻聚合与富化工具
 
-AI 驱动的资讯聚合与富化工具。自动抓取 RSS 订阅源，通过 LLM 对每篇文章生成标题、摘要和观点，并从 OS+AI 视角自动挑选本日最值得关注的 Top3。
+[![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-## 功能特性
+NewsPilot 是一个智能新闻聚合平台，能够自动从多个热榜平台和 RSS 订阅源抓取新闻，通过 AI 进行内容富化（摘要、观点提取），并生成美观的 HTML 报告，支持多渠道推送通知。
 
-- **RSS 聚合**：支持多订阅源，可配置新鲜度过滤（N 天内）
-- **LLM 富化**：对每篇文章自动生成「标题 + 总结 + 观点」（单条模式，避免超时）
-- **OS+AI 排序**：以「是否对操作系统/AI 系统设计有启发」为视角，自动打分并选出 Top3
-  - 分批处理（每批 5 条），独立超时控制（300s）
-  - 打分结果当天缓存，重复运行不重复调用 LLM
-- **单篇富化**：支持传入任意 URL 或正文，即时生成摘要（支持微信公众号等）
-- **多渠道推送**：飞书、钉钉、企业微信、Telegram、邮件、Bark、Slack、ntfy
-- **HTML 报告**：生成可视化日报，含 OS+AI Top3 置顶区块
-- **本地存储**：SQLite + 可选 S3 兼容远程存储
+## ✨ 核心特性
 
-## 快速开始
+### 📰 多源新闻聚合
+- **热榜平台**：支持今日头条、百度热搜、微博、知乎、抖音、B站、财联社、华尔街见闻等
+- **RSS 订阅**：支持任意 RSS 源，内置 AI 领域优质信源（机器之心、新智元、量子位等）
+- **智能去重**：跨平台相同新闻自动合并
 
-### 环境要求
+### 🤖 AI 内容富化
+- **智能摘要**：自动生成 2-3 句话的内容摘要
+- **观点提取**：提炼核心观点和趋势判断
+- **全文抓取**：支持抓取文章正文进行深度分析
+- **多模型支持**：兼容 OpenAI、Claude、Gemini、GLM、通义千问等
 
-- Python 3.10+
-- [uv](https://docs.astral.sh/uv/)（推荐）
+### 📊 多模式报告
+| 模式 | 说明 | 适用场景 |
+|------|------|----------|
+| `daily` | 当日汇总 | 日报总结、全面了解热点 |
+| `current` | 当前榜单 | 实时热点追踪 |
+| `incremental` | 增量监控 | 只推送新增内容，避免打扰 |
 
-### 安装
+### 🚀 多渠道推送
+- 飞书机器人
+- 钉钉机器人
+- 企业微信
+- Telegram
+- 邮件
+- Slack、Bark、ntfy
+
+### 💾 灵活存储
+- **本地存储**：SQLite + HTML/TXT 文件
+- **远程存储**：S3 兼容协议（R2/OSS/COS/MinIO）
+- **数据同步**：支持 MCP Server 远程查询
+
+## 🚀 快速开始
+
+### 1. 安装依赖
 
 ```bash
-git clone https://github.com/icey-zhang/InfoAgent.git
-cd InfoAgent
+# 使用 uv（推荐）
 uv sync
+
+# 或使用 pip
+pip install -e .
 ```
 
-### 配置
-
-复制并编辑配置文件：
+### 2. 配置
 
 ```bash
-cp config/config.yaml config/config.yaml.local
-# 编辑 config/config.yaml，填入 LLM 配置和推送渠道
+cp  config/config.yaml.local config/config.yaml
 ```
 
-**LLM 配置**（`config/config.yaml`）：
+编辑 `config/config.yaml.local`，配置：
+- RSS 订阅源
+- LLM API 信息
+- 推送渠道 webhook
+
+### 3. 运行
+
+```bash
+# 完整工作流（抓取 + 富化 + 报告）
+uv run NewsPilot
+
+# 仅抓取（跳过 LLM 富化）
+uv run NewsPilot --no-llm
+
+# 仅生成报告（从已有数据）
+uv run NewsPilot --skip-crawl
+
+# 单篇文章富化
+uv run NewsPilot enrich-article --url "https://example.com/article"
+
+# 单篇文章仅抓取正文（跳过 LLM 富化），默认保存到 output/fulltext/YYYY-MM-DD/
+uv run NewsPilot enrich-article --url "https://example.com/article" --fetch-only
+
+# 仅抓取并打印正文，不保存文件
+uv run NewsPilot enrich-article --url "https://example.com/article" --fetch-only --no-save
+```
+
+## 📁 项目结构
+
+```
+NewsPilot/
+├── __main__.py           # CLI 入口
+├── context.py            # 应用上下文
+├── core/                 # 核心功能
+│   ├── analyzer.py       # 热榜分析器
+│   ├── frequency.py      # 频率词统计
+│   ├── data.py           # 数据处理
+│   └── config.py         # 配置管理
+├── crawler/              # 爬虫模块
+│   ├── fetcher.py        # 热榜抓取
+│   └── rss/              # RSS 抓取
+│       ├── fetcher.py
+│       └── parser.py
+├── llm/                  # LLM 富化
+│   ├── enrich.py         # 文章富化
+│   ├── agent_enrich.py   # Agent 原生富化
+│   ├── fulltext.py       # 全文抓取
+│   └── openai_compat.py  # OpenAI 兼容接口
+├── report/               # 报告生成
+│   ├── generator.py      # 报告生成器
+│   ├── html.py           # HTML 渲染
+│   ├── formatter.py      # 格式化
+│   └── history.py        # 历史页面
+├── notification/         # 通知推送
+│   ├── dispatcher.py     # 调度器
+│   ├── senders.py        # 发送器
+│   └── renderer.py       # 内容渲染
+├── storage/              # 存储管理
+│   ├── manager.py        # 存储管理器
+│   ├── local.py          # 本地存储
+│   ├── remote.py         # 远程存储
+│   └── llm_store.py      # LLM 结果存储
+├── workflows/            # LangGraph 工作流
+│   └── workflow.py
+└── utils/                # 工具函数
+    ├── time.py
+    └── url.py
+
+config/
+├── config.yaml           # 主配置
+└── frequency_words.txt   # 频率词配置
+
+output/                   # 输出目录
+├── YYYY-MM-DD/
+│   ├── html/             # HTML 报告
+│   └── rss/              # RSS 数据
+└── fulltext/
+    └── YYYY-MM-DD/
+        ├── <url_hash>.txt   # 单篇文章抓取正文
+        └── <url_hash>.json  # URL、标题、抓取状态、字符数等元数据
+```
+
+## ⚙️ 配置说明
+
+### 基础配置
+
+```yaml
+app:
+  timezone: "Asia/Shanghai"  # 时区设置
+
+report:
+  mode: "daily"              # 报告模式: daily | current | incremental
+  display_mode: "keyword"    # 显示模式: keyword | platform
+  rank_threshold: 5          # 排名高亮阈值
+```
+
+### RSS 配置
+
+```yaml
+rss:
+  enabled: true
+  freshness_filter:
+    enabled: true
+    max_age_days: 7          # 只推送 7 天内文章
+  feeds:
+    - id: "jiqizhixin"
+      name: "机器之心"
+      url: "https://..."
+```
+
+### LLM 配置
 
 ```yaml
 llm:
   enabled: true
-  base_url: "https://api.openai.com"   # 或任意 OpenAI 兼容接口
-  api_key: ""                           # 建议用环境变量 TREND_LLM_API_KEY
-  model: "gpt-4o-mini"
-  tasks: ["item_enrich"]
+  base_url: "https://api.openai.com/v1"
+  api_key: "${NP_LLM_API_KEY}"  # 推荐用环境变量
+  model: "gpt-4"
+  tasks: ["item_enrich"]           # 富化任务
+  fulltext:
+    enabled: true                  # 启用全文抓取
 ```
 
-> ⚠️ 强烈建议通过环境变量传入 API Key，避免提交到仓库：
-> ```bash
-> export TREND_LLM_API_KEY="your-api-key"
-> ```
+### 推送配置
 
-**RSS 订阅源**：在 `config/config.yaml` 的 `rss.feeds` 下添加。
-
-### 运行
-
-```bash
-# 完整工作流（抓取 + 富化 + 推送）
-uv run python -m InfoAgent
-
-# 单篇文章富化（传 URL，自动抓取正文）
-uv run python -m InfoAgent enrich-article --url "https://example.com/article"
-
-# 单篇文章富化（传 URL + 原始标题）
-uv run python -m InfoAgent enrich-article --url "https://..." --title "原始标题"
-
-# 单篇文章富化（直接粘贴正文）
-uv run python -m InfoAgent enrich-article --content "文章正文..." --title "标题"
+```yaml
+notification:
+  enabled: true
+  channels:
+    feishu:
+      webhook_url: "https://open.feishu.cn/..."
+    dingtalk:
+      webhook_url: "https://oapi.dingtalk.com/..."
 ```
 
-也可以双击 `enrich_article.command`（macOS）交互式运行单篇富化。
+## 🏗️ 架构设计
 
-## 项目结构
+### 数据流
 
 ```
-InfoAgent/
-├── config/
-│   └── config.yaml          # 主配置文件
-├── InfoAgent/
-│   ├── __main__.py          # CLI 入口
-│   ├── llm/
-│   │   ├── enrich.py        # LLM 富化主逻辑（含 OS+AI 排序、单篇富化）
-│   │   ├── prompt.py        # Prompt 构建
-│   │   ├── fulltext.py      # 全文抓取
-│   │   └── openai_compat.py # OpenAI 兼容客户端
-│   ├── crawler/             # RSS / 热榜抓取
-│   ├── storage/             # 数据持久化（SQLite / S3）
-│   ├── report/              # HTML 报告生成
-│   └── notification/        # 多渠道推送
-├── enrich_article.command   # macOS 双击运行的单篇富化工具
-└── output/                  # 运行输出（已 gitignore）
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│  热榜平台   │    │  RSS 订阅   │    │  配置文件   │
+└──────┬──────┘    └──────┬──────┘    └──────┬──────┘
+       │                  │                  │
+       └──────────────────┼──────────────────┘
+                          ▼
+                   ┌─────────────┐
+                   │   Crawler   │
+                   └──────┬──────┘
+                          ▼
+                   ┌─────────────┐
+                   │   Storage   │
+                   │  (SQLite)   │
+                   └──────┬──────┘
+                          ▼
+                   ┌─────────────┐
+                   │  LLM Enrich │
+                   └──────┬──────┘
+                          ▼
+                   ┌─────────────┐
+                   │   Report    │
+                   │  Generator  │
+                   └──────┬──────┘
+                          ▼
+              ┌───────────────────────┐
+              │  HTML / Notification  │
+              └───────────────────────┘
 ```
 
-## 环境变量
+### 双模式运行
 
-| 变量 | 说明 | 默认值 |
-|---|---|---|
-| `TREND_LLM_API_KEY` | LLM API Key | 读取 config.yaml |
-| `TREND_LLM_BASE_URL` | LLM 接口地址 | 读取 config.yaml |
-| `TREND_LLM_MODEL` | 模型名称 | 读取 config.yaml |
-| `TREND_LLM_TIMEOUT` | 请求超时（秒） | 90 |
-| `TREND_LLM_RANK_TIMEOUT` | OS+AI 排序超时（秒） | 300 |
-| `TREND_LLM_DEBUG` | 开启调试日志 | 0 |
+- **Legacy 模式**：传统的命令式运行
+- **LangGraph 模式**：现代化的工作流编排（默认优先）
 
-## License
+## 🛠️ 开发
 
-MIT
+### 添加新的热榜源
+
+在 `NewsPilot/crawler/fetcher.py` 中添加新的抓取逻辑。
+
+### 自定义 LLM 富化
+
+在 `NewsPilot/llm/prompt.py` 中修改提示词模板。
+
+### 扩展推送渠道
+
+在 `NewsPilot/notification/senders.py` 中添加新的发送器。
+
+## 📄 输出示例
+
+生成的 HTML 报告包含：
+- 热点词汇统计（按频次排序）
+- 各平台新闻列表
+- AI 生成的摘要和观点
+- 新增热点高亮
+- RSS 订阅更新
+
+报告保存路径：`output/YYYY-MM-DD/html/当日汇总.html`
+
+## 📝 License
+
+MIT License
+
+## 🤝 贡献
+
+欢迎提交 Issue 和 PR！
+
+---
+
+**NewsPilot** - 让信息获取更智能 🚀

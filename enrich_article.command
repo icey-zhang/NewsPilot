@@ -4,7 +4,7 @@
 cd "$(dirname "$0")"
 
 echo "================================================"
-echo "  InfoAgent - 单篇文章富化工具"
+echo "  NewsPilot - 单篇文章富化工具"
 echo "================================================"
 echo ""
 
@@ -24,7 +24,7 @@ if [ -n "$article_title" ]; then
 fi
 
 # 运行富化
-eval uv run python -m InfoAgent enrich-article $cmd_args
+eval uv run python -m NewsPilot enrich-article $cmd_args
 
 echo ""
 echo "------------------------------------------------"

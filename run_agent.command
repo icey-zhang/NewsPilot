@@ -9,7 +9,7 @@ export TREND_LLM_DEBUG=1
 export TREND_LLM_DEBUG_DUMP=1
 
 # 运行程序
-uv run python -m InfoAgent
+uv run python -m NewsPilot
 
 # 模拟 Windows 的 pause (等待按任意键退出)
 echo "------------------------------------------------"

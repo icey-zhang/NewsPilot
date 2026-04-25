@@ -1,5 +1,5 @@
 # ═══════════════════════════════════════════════════════════════
-#                    InfoAgent 配置文件
+#                    NewsPilot 配置文件
 # ═══════════════════════════════════════════════════════════════
 
 
@@ -132,7 +132,7 @@ rss:
 # 当前实现为 OpenAI-compatible 接口（Chat Completions）。
 #
 # ⚠️ 安全提示：
-# - 建议把 api_key 放到环境变量 TREND_LLM_API_KEY，不要提交到仓库
+# - 建议把 api_key 放到环境变量 NP_LLM_API_KEY，不要提交到仓库
 # - config.yaml 里可以只填 base_url/model
 # ===============================================================
 llm:
@@ -140,22 +140,7 @@ llm:
   # base_url 可以填写到根（如 https://api.openai.com），也可以直接填写到 /v1（如 http://host:port/v1）
   # base_url: "http://your-proxy-host:port/v1"
   # api_key: "your-api-key"
-  # model: "minimax-m2.5"
-  # base_url: "https://ark.cn-beijing.volces.com/api/v3"
-  # api_key: "your-volc-api-key"
-  # model: "ep-xxxxxxxxxxxxxxxxx-xxxxx"
 
-  # model: "gemini-3-flash-preview"
-  # model: "gemini-3-pro-preview-nothinking"
-
-  base_url: "http://127.0.0.1:8317/v1"
-  api_key: "your-api-key"              # ⚠️ 建议改用环境变量 TREND_LLM_API_KEY
-  model: "gemini-3.1-pro-high"
-
-  # model: "qwen3-max"
-  # base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
-  # api_key: "your-dashscope-api-key"
-  # timeout: 1500
   # 默认富化任务（当 MCP 调用不方便传 llm_tasks 时使用）
   # 可选：summary / classify / cluster / item_enrich
   # tasks: []
@@ -335,7 +320,7 @@ storage:
 # ===============================================================
 advanced:
   # 版本检查
-  version_check_url: "https://raw.githubusercontent.com/sansan0/InfoAgent/refs/heads/master/version"
+  version_check_url: "https://raw.githubusercontent.com/sansan0/NewsPilot/refs/heads/master/version"
 
   # 爬虫设置
   crawler:

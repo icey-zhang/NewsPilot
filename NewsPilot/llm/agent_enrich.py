@@ -1,0 +1,190 @@
+# coding=utf-8
+"""
+Agent-native enrichment support.
+
+This module provides CLI commands for:
+1. Fetching RSS items for Agent to enrich
+2. Saving Agent's enrichment results to database
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+
+def _load_config():
+    """Load config from config/config.yaml"""
+    from NewsPilot.core import load_config
+    return load_config()
+
+
+def _get_storage_manager():
+    """Get storage manager instance"""
+    from NewsPilot.storage.manager import StorageManager
+    return StorageManager()
+
+
+def get_rss_items_for_agent(date: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Fetch RSS items from storage for Agent to enrich.
+
+    Returns:
+        {
+            "date": str,
+            "items": [{"url": ..., "title": ..., "feed_name": ..., "published_at": ...}, ...],
+            "enrichment_prompt": str  # Instructions for Agent
+        }
+    """
+    storage = _get_storage_manager()
+    target_date = date or datetime.now().strftime("%Y-%m-%d")
+
+    rss_data = storage.get_latest_rss_data(target_date) or storage.get_rss_data(target_date)
+    if not rss_data:
+        return {"date": target_date, "items": [], "error": "No RSS data found"}
+
+    # Convert RSSData to simple list
+    items: List[Dict[str, Any]] = []
+    for feed_id, rss_list in rss_data.items.items():
+        feed_name = rss_data.id_to_name.get(feed_id, feed_id)
+        for item in rss_list:
+            items.append({
+                "url": item.url,
+                "title": item.title,
+                "feed_name": feed_name,
+                "feed_id": feed_id,
+                "published_at": item.published_at,
+            })
+
+    # Sort by published_at descending, limit to 50 items
+    items = sorted(items, key=lambda x: x.get("published_at", ""), reverse=True)[:50]
+
+    enrichment_prompt = """
+对每条 RSS 文章生成：
+- title: 一句话概括真正内容（避免标题党）
+- summary: 2-3句话，发生了什么、解决了什么问题、核心做法
+- viewpoint: 2-3句话，判断与趋势（可含不确定性声明）
+
+写作要求：
+- 总字数尽量短，能删就删
+- 不复述细节、不堆例子
+- 观点是抽象一层后的判断，不是原文改写
+- 避免"很重要/具有里程碑意义/未来可期"等空话
+- 语气冷静、专业
+
+输出严格 JSON 格式：
+{"items": [{"url": "...", "title": "...", "summary": "...", "viewpoint": "..."}]}
+"""
+
+    return {
+        "date": target_date,
+        "items": items,
+        "enrichment_prompt": enrichment_prompt,
+        "total_count": len(items),
+    }
+
+
+def save_agent_enrichment(
+    *,
+    date: str,
+    enrichment_json: Dict[str, Any],
+    model: str = "agent-native",
+) -> str:
+    """
+    Save Agent's enrichment results to database.
+
+    Args:
+        date: Date string (YYYY-MM-DD)
+        enrichment_json: {"items": [{"url": ..., "title": ..., "summary": ..., "viewpoint": ...}]}
+        model: Model identifier (default "agent-native")
+
+    Returns:
+        Path to saved database file
+    """
+    from NewsPilot.storage.llm_store import save_llm_run
+
+    # Normalize items
+    items = enrichment_json.get("items") or []
+    if isinstance(items, list):
+        normalized_items = []
+        for it in items:
+            if isinstance(it, dict):
+                normalized_items.append({
+                    "url": (it.get("url") or "").strip(),
+                    "title": (it.get("title") or "").strip(),
+                    "summary": (it.get("summary") or "").strip(),
+                    "viewpoint": (it.get("viewpoint") or "").strip(),
+                })
+        enrichment_json = {"items": normalized_items}
+
+    db_path = save_llm_run(
+        output_dir="output",
+        date=date,
+        kind="rss_item_enrich",
+        model=model,
+        payload={
+            "date": date,
+            "mode": "agent",
+            "prompt_version": 2,
+            "items": enrichment_json,
+        },
+    )
+    return db_path
+
+
+def _cmd_fetch(args):
+    """CLI: Fetch RSS items for Agent"""
+    result = get_rss_items_for_agent(date=args.date)
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+
+
+def _cmd_save(args):
+    """CLI: Save Agent enrichment results"""
+    if args.input_file:
+        with open(args.input_file, "r", encoding="utf-8") as f:
+            enrichment_json = json.load(f)
+    elif args.json:
+        enrichment_json = json.loads(args.json)
+    else:
+        print("Error: --input-file or --json required")
+        sys.exit(1)
+
+    db_path = save_agent_enrichment(
+        date=args.date,
+        enrichment_json=enrichment_json,
+        model=args.model or "agent-native",
+    )
+    print(f"Saved to: {db_path}")
+
+
+def main():
+    """CLI entry point"""
+    parser = argparse.ArgumentParser(
+        prog="NewsPilot llm.agent_enrich",
+        description="Agent-native enrichment support",
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    # fetch: Get RSS items for Agent to enrich
+    fetch_parser = subparsers.add_parser("fetch", help="Fetch RSS items for enrichment")
+    fetch_parser.add_argument("--date", default="", help="Date (YYYY-MM-DD, default today)")
+    fetch_parser.set_defaults(func=_cmd_fetch)
+
+    # save: Save Agent's enrichment results
+    save_parser = subparsers.add_parser("save", help="Save enrichment results")
+    save_parser.add_argument("--date", required=True, help="Date (YYYY-MM-DD)")
+    save_parser.add_argument("--input-file", default="", help="JSON file path")
+    save_parser.add_argument("--json", default="", help="JSON string")
+    save_parser.add_argument("--model", default="agent-native", help="Model identifier")
+    save_parser.set_defaults(func=_cmd_save)
+
+    args = parser.parse_args()
+    args.func(args)
+
+
+if __name__ == "__main__":
+    main()
