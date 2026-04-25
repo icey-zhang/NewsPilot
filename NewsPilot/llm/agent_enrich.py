@@ -60,8 +60,8 @@ def get_rss_items_for_agent(date: Optional[str] = None) -> Dict[str, Any]:
                 "published_at": item.published_at,
             })
 
-    # Sort by published_at descending, limit to 50 items
-    items = sorted(items, key=lambda x: x.get("published_at", ""), reverse=True)[:50]
+    # Sort by published_at descending; no hard cap (full 7-day window kept).
+    items = sorted(items, key=lambda x: x.get("published_at", ""), reverse=True)
 
     enrichment_prompt = """
 对每条 RSS 文章生成：
@@ -97,6 +97,11 @@ def save_agent_enrichment(
     """
     Save Agent's enrichment results to database.
 
+    Each call merges the new items with the latest previous run for
+    (date, kind="rss_item_enrich") so the routine can save items
+    one-at-a-time without losing earlier saves. Merge key is `url`;
+    the latest call wins for any given url.
+
     Args:
         date: Date string (YYYY-MM-DD)
         enrichment_json: {"items": [{"url": ..., "title": ..., "summary": ..., "viewpoint": ...}]}
@@ -105,21 +110,36 @@ def save_agent_enrichment(
     Returns:
         Path to saved database file
     """
-    from NewsPilot.storage.llm_store import save_llm_run
+    from NewsPilot.storage.llm_store import get_latest_llm_run, save_llm_run
 
-    # Normalize items
-    items = enrichment_json.get("items") or []
-    if isinstance(items, list):
-        normalized_items = []
-        for it in items:
-            if isinstance(it, dict):
-                normalized_items.append({
-                    "url": (it.get("url") or "").strip(),
-                    "title": (it.get("title") or "").strip(),
-                    "summary": (it.get("summary") or "").strip(),
-                    "viewpoint": (it.get("viewpoint") or "").strip(),
-                })
-        enrichment_json = {"items": normalized_items}
+    def _normalize(items_list):
+        out = []
+        if isinstance(items_list, list):
+            for it in items_list:
+                if isinstance(it, dict):
+                    out.append({
+                        "url": (it.get("url") or "").strip(),
+                        "title": (it.get("title") or "").strip(),
+                        "summary": (it.get("summary") or "").strip(),
+                        "viewpoint": (it.get("viewpoint") or "").strip(),
+                    })
+        return out
+
+    new_items = _normalize(enrichment_json.get("items") or [])
+
+    # Merge with latest previous run for this date+kind, dedup by url.
+    prev = get_latest_llm_run(output_dir="output", date=date, kind="rss_item_enrich")
+    merged_by_url: Dict[str, Dict[str, Any]] = {}
+    if prev:
+        prev_items = prev.get("payload", {}).get("items", {}).get("items", [])
+        for it in _normalize(prev_items):
+            if it["url"]:
+                merged_by_url[it["url"]] = it
+    for it in new_items:
+        if it["url"]:
+            merged_by_url[it["url"]] = it
+
+    merged_items = list(merged_by_url.values())
 
     db_path = save_llm_run(
         output_dir="output",
@@ -130,7 +150,7 @@ def save_agent_enrichment(
             "date": date,
             "mode": "agent",
             "prompt_version": 2,
-            "items": enrichment_json,
+            "items": {"items": merged_items},
         },
     )
     return db_path

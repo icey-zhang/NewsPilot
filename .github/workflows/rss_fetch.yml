@@ -2,7 +2,7 @@ name: RSS Fetch (Weekly)
 
 on:
   schedule:
-    # 每周五 北京时间 02:00（UTC 周四 18:00）抓取，Routine 在同天北京时间 06:00（UTC 周四 22:00）跑
+    # 每周五 北京时间 02:00（UTC 周四 18:00）抓取过去 7 天内的文章
     - cron: '0 18 * * 4'
   workflow_dispatch:    # 允许手动触发
 
@@ -32,11 +32,11 @@ jobs:
           # 关闭 LLM，只抓取 RSS + 全文内容
           NP_SKIP_LLM: "1"
 
-      - name: Export RSS items (with fulltext) for Claude analysis
+      - name: Export RSS items (with fulltext, cached) for Claude analysis
         run: |
           mkdir -p data/rss output
           uv run python - <<'EOF'
-          import json, sys
+          import json, os, sys
           from datetime import datetime
 
           from NewsPilot.core import load_config
@@ -44,6 +44,7 @@ jobs:
           from NewsPilot.llm.fulltext import FullTextConfig, fetch_article_text
 
           date = datetime.utcnow().strftime("%Y-%m-%d")
+          out_path = "data/rss/rss_items_for_enrich.json"
 
           # 1. 读取 RSS 条目
           result = get_rss_items_for_agent(date=date)
@@ -66,31 +67,53 @@ jobs:
           )
           max_items = int(ft_raw.get("MAX_ITEMS", 200) or 200)
 
-          # 3. 逐条抓全文
-          ok, failed = 0, 0
+          # 3. 加载上一次抓取结果，建立 URL -> content 缓存
+          cache = {}
+          if os.path.exists(out_path):
+              try:
+                  with open(out_path, "r", encoding="utf-8") as f:
+                      prev = json.load(f)
+                  for it in prev.get("items", []):
+                      url = (it.get("url") or "").strip()
+                      content = it.get("content") or ""
+                      if url and content and len(content) >= ft_cfg.min_paragraph_chars:
+                          cache[url] = content
+                  print(f"  从上次抓取复用 {len(cache)} 条 fulltext 缓存")
+              except Exception as e:
+                  print(f"  WARNING: 读旧数据失败 ({e})，跳过缓存", file=sys.stderr)
+
+          # 4. 逐条处理：缓存命中复用，否则现抓
+          cached_reused = 0
+          fetched_ok = 0
+          fetched_failed = 0
           for idx, item in enumerate(items[:max_items]):
-              url = item.get("url", "")
+              url = (item.get("url") or "").strip()
               if not url:
+                  continue
+              if url in cache:
+                  item["content"] = cache[url]
+                  cached_reused += 1
                   continue
               content = fetch_article_text(url, ft_cfg)
               if content and len(content) >= ft_cfg.min_paragraph_chars:
                   item["content"] = content
-                  ok += 1
+                  fetched_ok += 1
               else:
-                  failed += 1
+                  fetched_failed += 1
               if (idx + 1) % 10 == 0:
-                  print(f"  进度 {idx+1}/{min(len(items), max_items)}，成功 {ok}，失败 {failed}")
+                  print(f"  进度 {idx+1}/{min(len(items), max_items)}，缓存 {cached_reused}，新抓 {fetched_ok}，失败 {fetched_failed}")
 
           result["items"] = items
-          result["fulltext_ok"] = ok
-          result["fulltext_failed"] = failed
+          result["fulltext_ok"] = cached_reused + fetched_ok
+          result["fulltext_failed"] = fetched_failed
+          result["fulltext_cached_reused"] = cached_reused
+          result["fulltext_newly_fetched"] = fetched_ok
 
-          # 4. 写文件
-          out_path = "data/rss/rss_items_for_enrich.json"
+          # 5. 写文件
           with open(out_path, "w", encoding="utf-8") as f:
               json.dump(result, f, ensure_ascii=False, indent=2)
 
-          print(f"导出完成: {len(items)} 条，全文成功 {ok}，失败/空 {failed}")
+          print(f"导出完成: {len(items)} 条，全文有效 {cached_reused + fetched_ok}（缓存 {cached_reused} + 新抓 {fetched_ok}），失败/空 {fetched_failed}")
           EOF
 
       - name: Commit RSS data to main

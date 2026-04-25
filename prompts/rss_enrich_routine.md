@@ -78,11 +78,7 @@ Each item in `items` has:
 
 > **分析优先级**：有 `content` → 依据正文分析；无 `content` → 依据 `title` + `feed_name` 推断，并在 summary 开头标注「（仅凭标题推断）」。
 
-### 4. Enrich each RSS item
-
-For each item in the JSON, produce a structured enrichment following these **strict rules**:
-
-#### Analysis style guide
+### 4. Analysis style guide
 
 **写作要求：**
 - 总字数尽量短，能删就删
@@ -107,39 +103,92 @@ For each item in the JSON, produce a structured enrichment following these **str
 
 **必须保留原始 `url`** 用于和数据库匹配。
 
-#### Batching
+### 5. Process each item — read, enrich, save, **one at a time**
 
-Process items in batches of 10 to avoid overload. For each batch, produce JSON in this format:
+> ⚠️ **关键流程要求**：必须**逐条处理**（read → enrich → save → 下一条）。
+> 严禁先把所有 50+ 条全部读入 / 一次性写一个大 `enriched.json` / 一次性 save —— 会撑爆 context。
+> `save` 命令已在 [agent_enrich.py:save_agent_enrichment](NewsPilot/llm/agent_enrich.py:save_agent_enrichment) 内置「按 url 合并」语义，每次保存自动累积，无需担心覆盖。
+
+**准备**：
+
+```bash
+RSS_JSON="data/rss/rss_items_for_enrich.json"
+TODAY=$(python3 -c "import json; print(json.load(open('$RSS_JSON'))['date'])")
+TOTAL=$(python3 -c "import json; print(json.load(open('$RSS_JSON'))['total_count'])")
+mkdir -p output/enriched_tmp
+echo "今日: $TODAY，待富化: $TOTAL 条"
+```
+
+**对索引 `i = 0, 1, 2, ..., TOTAL-1` 依次执行以下三步**（一条做完再做下一条）：
+
+#### 5a. 取出第 i 条（截断 content 控制 context）
+
+```bash
+python3 - <<PYEOF
+import json
+i = $i
+RSS_JSON = "$RSS_JSON"
+d = json.load(open(RSS_JSON))
+item = d["items"][i]
+out = {
+    "url": item.get("url"),
+    "title": item.get("title"),
+    "feed_name": item.get("feed_name"),
+    "published_at": item.get("published_at"),
+    "content": (item.get("content") or "")[:8000],   # 单条 ≤8KB，避免 context 爆
+}
+print(json.dumps(out, ensure_ascii=False, indent=2))
+PYEOF
+```
+
+#### 5b. 你（Agent）根据该条产出 4 字段 enrichment
+
+按上面 §4 的写作要求，产出：
 
 ```json
+{"url": "...原 url 不改...", "title": "...", "summary": "...", "viewpoint": "..."}
+```
+
+#### 5c. 写到临时文件并立即 save（**一次只保存这一条**）
+
+```bash
+i=$i   # 当前索引
+cat > "output/enriched_tmp/item_${i}.json" <<'EOF'
 {
   "items": [
     {
-      "url": "https://...",
-      "title": "...",
-      "summary": "...",
-      "viewpoint": "..."
+      "url": "<原 url>",
+      "title": "<生成的 title>",
+      "summary": "<生成的 summary>",
+      "viewpoint": "<生成的 viewpoint>"
     }
   ]
 }
-```
-
-### 5. Save enrichment results
-
-After all batches are done, merge the results into a single JSON file and save via the CLI:
-
-```bash
-# 把所有 batch 合并写入 output/enriched.json
-# 格式：{"items": [...all enriched items...]}
-
-TODAY=$(python3 -c "import json; print(json.load(open('$RSS_JSON'))['date'])")
+EOF
 
 uv run python -m NewsPilot llm.agent_enrich save \
   --date "$TODAY" \
-  --input-file output/enriched.json \
+  --input-file "output/enriched_tmp/item_${i}.json" \
   --model "claude-code-routine"
+```
 
-echo "✅ 富化结果已保存到数据库"
+> save 内部会读取本日 `output/llm/{date}.db` 中最新一行的 items，按 url 合并这一条新数据后再写一行。所以多次调用累积保存，最终一行包含全部已处理 url。
+
+**全部 $TOTAL 条处理完后**：
+
+```bash
+# 清理临时文件
+rm -rf output/enriched_tmp
+
+# 校验数据库里实际累积了多少条
+python3 - <<'PYEOF'
+from NewsPilot.storage.llm_store import get_latest_llm_run
+import os
+date = os.popen("python3 -c \"import json; print(json.load(open('data/rss/rss_items_for_enrich.json'))['date'])\"").read().strip()
+prev = get_latest_llm_run(output_dir="output", date=date, kind="rss_item_enrich")
+items = (prev or {}).get("payload", {}).get("items", {}).get("items", [])
+print(f"DB 内已累积 {len(items)} 条富化结果")
+PYEOF
 ```
 
 ### 6. Generate HTML report
@@ -173,7 +222,7 @@ else
 fi
 ```
 
-### 7. Output a summary
+### 8. Output a summary
 
 Report the following at the end of this Routine session:
 
@@ -186,11 +235,12 @@ Report the following at the end of this Routine session:
 ## Hard rules
 
 0. **绝对不允许本地抓取** — 严禁运行 `python -m NewsPilot`、`python -m NewsPilot --no-llm`、`uv run python -m NewsPilot ...`、或任何形式的本地 RSS 抓取脚本。RSS 抓取**只**是 GitHub Actions 的职责。如果 `data/rss/rss_items_for_enrich.json` 缺失，直接 `exit 1` 并提示用户触发 workflow。
-1. **不捏造 URL** — `url` 字段必须原样保留，不得修改
-2. **不跳过条目** — 即使 content 为空，也必须基于 title + feed_name 给出 summary/viewpoint
-3. **每条 summary 不超过 100 字，viewpoint 不超过 80 字**
-4. **不评价文章质量本身**（如"这篇文章写得很好"）— 只分析内容
-5. **viewpoint 禁用词**：必涨、必跌、一定、肯定、稳赚、颠覆（除非原文有明确数据支撑）
+1. **必须逐条 save** — 每生成一条 enrichment 立即 save，**不要**先生成全部再一次性 save。`save` 命令内置 url 合并语义，多次调用会自动累积；批量保存只会把整个 session 撑爆。
+2. **不捏造 URL** — `url` 字段必须原样保留，不得修改
+3. **不跳过条目** — 即使 content 为空，也必须基于 title + feed_name 给出 summary/viewpoint
+4. **每条 summary 不超过 100 字，viewpoint 不超过 80 字**
+5. **不评价文章质量本身**（如"这篇文章写得很好"）— 只分析内容
+6. **viewpoint 禁用词**：必涨、必跌、一定、肯定、稳赚、颠覆（除非原文有明确数据支撑）
 
 ## What if data/rss/rss_items_for_enrich.json is missing?
 
