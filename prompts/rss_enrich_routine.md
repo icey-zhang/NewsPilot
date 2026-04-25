@@ -6,8 +6,6 @@ You are the AI enrichment component of NewsPilot, a two-stage RSS analysis pipel
 
 Your job is to download the latest artifact, read the RSS items, and produce a `title / summary / viewpoint` enrichment for each one — following the exact analysis style defined below.
 
-> **Schedule**: 每周五 北京时间 06:00（UTC 周四 22:00，cron: `0 22 * * 4`）运行。GitHub Actions rss_fetch.yml 在同天北京时间 02:00（UTC 周四 18:00）完成抓取，两者同天完成。
-
 ## Repository
 
 `https://github.com/YOUR_USERNAME/NewsPilot.git`
@@ -66,12 +64,20 @@ echo "RSS 文件路径: $RSS_JSON"
 python3 -c "import json; d=json.load(open('$RSS_JSON')); print(f'日期: {d[\"date\"]}，条目数: {d[\"total_count\"]}')"
 ```
 
-Read the full contents of `$RSS_JSON` to understand the RSS items. Each item has:
-- `url`: article URL
+Read the full contents of `$RSS_JSON` to understand the RSS items. Top-level fields:
+- `date`: fetch date (YYYY-MM-DD)
+- `total_count`: total number of items
+- `fulltext_ok`: number of items with full-text successfully fetched
+- `fulltext_failed`: number of items where full-text fetch failed (anti-crawl / timeout / empty)
+
+Each item in `items` has:
+- `url`: article URL（必须原样保留，用于数据库匹配）
 - `title`: original title
 - `feed_name`: source name (e.g., 机器之心, 量子位)
 - `published_at`: publish time
-- (optionally) `content`: full-text if crawled
+- `content` *(optional)*: full article text — **present only when GitHub Actions successfully crawled it**. If missing, the article was blocked by anti-crawl or timed out.
+
+> **分析优先级**：有 `content` → 依据正文分析；无 `content` → 依据 `title` + `feed_name` 推断，并在 summary 开头标注「（仅凭标题推断）」。
 
 ### 4. Enrich each RSS item
 
@@ -137,7 +143,23 @@ uv run python -m NewsPilot llm.agent_enrich save \
 echo "✅ 富化结果已保存到数据库"
 ```
 
-### 6. Commit and push results
+### 6. Generate HTML report
+
+After saving enrichment results, regenerate the HTML report using stored data (no re-crawl):
+
+```bash
+uv run python -m NewsPilot --skip-crawl
+echo "✅ HTML 报告已生成"
+
+# 同步最新 HTML 到 docs/（供 GitHub Pages 访问）
+mkdir -p docs
+cp output/*.html docs/ 2>/dev/null || true
+echo "✅ HTML 已同步到 docs/"
+```
+
+This reads the RSS data + LLM enrichment from the local SQLite databases and produces `output/YYYY-MM-DD.html` with the `title / summary / viewpoint` fields embedded.
+
+### 7. Commit and push results
 
 ```bash
 git config user.email "claude-routine@local"
@@ -147,7 +169,7 @@ git add output/
 if git diff --staged --quiet; then
   echo "No changes to commit — enrichment already up to date"
 else
-  git commit -m "enrich: $(date +%Y-%m-%d) RSS item enrichment by Claude"
+  git commit -m "enrich: $(date +%Y-%m-%d) RSS item enrichment + HTML report by Claude"
   git push origin main
 fi
 ```
