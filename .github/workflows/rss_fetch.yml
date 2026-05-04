@@ -38,12 +38,13 @@ jobs:
           uv run python - <<'EOF'
           import json, os, sys
           from datetime import datetime
+          from zoneinfo import ZoneInfo
 
           from NewsPilot.core import load_config
           from NewsPilot.llm.agent_enrich import get_rss_items_for_agent
           from NewsPilot.llm.fulltext import FullTextConfig, fetch_article_text
 
-          date = datetime.utcnow().strftime("%Y-%m-%d")
+          date = datetime.now(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d")
           out_path = "data/rss/rss_items_for_enrich.json"
 
           # 1. 读取 RSS 条目
@@ -104,6 +105,7 @@ jobs:
                   print(f"  进度 {idx+1}/{min(len(items), max_items)}，缓存 {cached_reused}，新抓 {fetched_ok}，失败 {fetched_failed}")
 
           result["items"] = items
+          result["total_count"] = len(items)
           result["fulltext_ok"] = cached_reused + fetched_ok
           result["fulltext_failed"] = fetched_failed
           result["fulltext_cached_reused"] = cached_reused
@@ -124,8 +126,8 @@ jobs:
           if git diff --staged --quiet; then
             echo "No changes to commit (data unchanged)"
           else
-            DATE=$(date -u +%Y-%m-%d)
-            COUNT=$(python3 -c "import json; print(json.load(open('data/rss/rss_items_for_enrich.json'))['total_count'])")
+            DATE=$(TZ=Asia/Shanghai date +%Y-%m-%d)
+            COUNT=$(python3 -c "import json; d=json.load(open('data/rss/rss_items_for_enrich.json')); print(d.get('total_count', len(d.get('items', []))))")
             git commit -m "data(rss): refresh ${DATE} (${COUNT} items)"
             git pull --rebase origin main
             git push origin main
