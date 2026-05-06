@@ -68,6 +68,9 @@ class OpenAICompatClient:
                 {"role": "user", "content": user + schema_text},
             ],
         }
+        stream = env_flag("NP_LLM_STREAM", default=self.model.startswith("gpt-5"))
+        if stream:
+            payload["stream"] = True
         # Some OpenAI-compatible gateways (e.g., LiteLLM) enforce model-group constraints.
         # Example: gpt-5.* and moonshot.* only supports temperature=1.0; passing other values yields 400.
         if temperature is not None:
@@ -85,7 +88,13 @@ class OpenAICompatClient:
         last_err: Optional[Exception] = None
         for attempt in range(max_retries + 1):
             try:
-                resp = requests.post(url, headers=headers, json=payload, timeout=self.timeout)
+                resp = requests.post(
+                    url,
+                    headers=headers,
+                    json=payload,
+                    timeout=self.timeout,
+                    stream=stream,
+                )
                 if resp.status_code in (408, 409, 425, 429) or 500 <= resp.status_code <= 599:
                     # retryable HTTP status; respect Retry-After for 429 when provided
                     retry_after = 0.0
@@ -97,7 +106,7 @@ class OpenAICompatClient:
                             retry_after = 0.0
                     resp.raise_for_status()
                 resp.raise_for_status()
-                data = resp.json()
+                data = _read_stream_response(resp) if stream else resp.json()
                 break
             except (requests.Timeout, requests.ConnectionError) as e:
                 last_err = e
@@ -128,11 +137,12 @@ class OpenAICompatClient:
             if last_err:
                 raise last_err
 
-        content = (
-            data.get("choices", [{}])[0]
-            .get("message", {})
-            .get("content", "")
-        )
+        content = data.get("stream_content") or ""
+        message = data.get("choices", [{}])[0].get("message", {})
+        if not content:
+            content = _extract_message_text(message)
+        if not content and message:
+            content = json.dumps(message, ensure_ascii=False)
 
         parsed = _safe_parse_json(content)
         return {
@@ -140,6 +150,76 @@ class OpenAICompatClient:
             "raw": content,
             "json": parsed,
         }
+
+
+def _extract_message_text(message: Dict[str, Any]) -> str:
+    content = message.get("content", "")
+    if isinstance(content, str) and content.strip():
+        return content
+    if isinstance(content, list):
+        parts: List[str] = []
+        for item in content:
+            if isinstance(item, dict):
+                text = item.get("text") or item.get("content")
+                if isinstance(text, str) and text.strip():
+                    parts.append(text.strip())
+            elif isinstance(item, str) and item.strip():
+                parts.append(item.strip())
+        if parts:
+            return "\n".join(parts)
+
+    reasoning = message.get("reasoning_content") or message.get("reasoning")
+    if isinstance(reasoning, str) and reasoning.strip():
+        return reasoning
+    return ""
+
+
+def _read_stream_response(resp: requests.Response) -> Dict[str, Any]:
+    content_parts: List[str] = []
+    reasoning_parts: List[str] = []
+    last_chunk: Dict[str, Any] = {}
+
+    for raw_line in resp.iter_lines(decode_unicode=True):
+        if not raw_line:
+            continue
+        line = raw_line.strip()
+        if not line.startswith("data:"):
+            continue
+        payload = line[5:].strip()
+        if payload == "[DONE]":
+            break
+        try:
+            chunk = json.loads(payload)
+        except Exception:
+            continue
+        last_chunk = chunk
+        for choice in chunk.get("choices") or []:
+            delta = choice.get("delta") or {}
+            text = delta.get("content")
+            if isinstance(text, str) and text:
+                content_parts.append(text)
+            reasoning = delta.get("reasoning_content") or delta.get("reasoning")
+            if isinstance(reasoning, str) and reasoning:
+                reasoning_parts.append(reasoning)
+
+    content = "".join(content_parts)
+    reasoning = "".join(reasoning_parts)
+    if not content and reasoning:
+        content = reasoning
+
+    return {
+        "choices": [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": content,
+                    "reasoning_content": reasoning or None,
+                }
+            }
+        ],
+        "stream_content": content,
+        "last_chunk": last_chunk,
+    }
 
 
 def _safe_parse_json(text: str) -> Optional[Dict[str, Any]]:

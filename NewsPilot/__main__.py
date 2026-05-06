@@ -92,9 +92,14 @@ def _cmd_enrich_article(args):
 
     print("\n" + "=" * 60)
     print(f"URL      : {result.get('url') or '(无)'}")
-    print(f"标题     : {result.get('title') or '(无)'}")
-    print(f"总结     : {result.get('summary') or '(无)'}")
-    print(f"观点     : {result.get('viewpoint') or '(无)'}")
+    raw = (result.get("raw") or "").strip()
+    if raw:
+        print("模型输出 :")
+        print(raw)
+    else:
+        print(f"标题     : {result.get('title') or '(无)'}")
+        print(f"总结     : {result.get('summary') or '(无)'}")
+        print(f"观点     : {result.get('viewpoint') or '(无)'}")
     print(f"模型     : {result.get('model') or '(无)'}")
     print(f"已保存至 : {result.get('db_path') or '(无)'}")
     print("=" * 60)

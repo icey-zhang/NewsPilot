@@ -1003,13 +1003,30 @@ def llm_enrich_article(
     resp = client.chat_json(system=system, user=user, json_schema_hint=schema_hint, temperature=0.2)
 
     data = resp.get("json") or {}
+    if isinstance(data, dict) and isinstance(data.get("items"), list):
+        matched = None
+        for candidate in data["items"]:
+            if not isinstance(candidate, dict):
+                continue
+            if (candidate.get("url") or "").strip() == url:
+                matched = candidate
+                break
+        data = matched or next((x for x in data["items"] if isinstance(x, dict)), {})
     result = {
         "url": url,
         "title": (data.get("title") or title or "").strip(),
         "summary": (data.get("summary") or "").strip(),
         "viewpoint": (data.get("viewpoint") or "").strip(),
         "model": resp.get("model", client.model),
+        "raw": resp.get("raw") or "",
     }
+    if not any((result["title"], result["summary"], result["viewpoint"])):
+        raw_preview = (resp.get("raw") or "").strip()
+        if len(raw_preview) > 500:
+            raw_preview = raw_preview[:500] + "\n...<truncated>..."
+        print("[enrich-article] WARNING: LLM 返回未解析出 title/summary/viewpoint")
+        if raw_preview:
+            print(f"[enrich-article] raw preview:\n{raw_preview}")
 
     db_path = save_llm_run(
         output_dir=output_dir,
@@ -1022,6 +1039,8 @@ def llm_enrich_article(
             "input_title": title,
             "has_fulltext": bool(content),
             "result": result,
+            "parsed_json": resp.get("json"),
+            "raw": resp.get("raw"),
         },
     )
     result["db_path"] = db_path
