@@ -179,10 +179,13 @@ def _read_stream_response(resp: requests.Response) -> Dict[str, Any]:
     reasoning_parts: List[str] = []
     last_chunk: Dict[str, Any] = {}
 
-    for raw_line in resp.iter_lines(decode_unicode=True):
+    for raw_line in resp.iter_lines(decode_unicode=False):
         if not raw_line:
             continue
-        line = raw_line.strip()
+        if isinstance(raw_line, bytes):
+            line = raw_line.decode("utf-8", errors="replace").strip()
+        else:
+            line = str(raw_line).strip()
         if not line.startswith("data:"):
             continue
         payload = line[5:].strip()
