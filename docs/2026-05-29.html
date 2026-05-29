@@ -1,0 +1,1649 @@
+
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>热点新闻分析</title>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" integrity="sha512-BNaRQnYJYiPSqHHDb58B0yaPfCu+Wgds8Gp/gU33kqBtgNS4tSPHuGibyoeqMV/TJlSKda6FXzoEyYGjTe+vXA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+        <style>
+            :root {
+                --primary-gradient: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+                --bg-color: #f3f4f6;
+                --card-bg: #ffffff;
+                --text-main: #1f2937;
+                --text-secondary: #6b7280;
+                --text-light: #9ca3af;
+                --accent-blue: #3b82f6;
+                --accent-red: #ef4444;
+                --accent-orange: #f97316;
+                --accent-green: #10b981;
+                --border-color: #e5e7eb;
+            }
+
+            * { box-sizing: border-box; }
+            
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+                margin: 0;
+                padding: 20px;
+                background: var(--bg-color);
+                color: var(--text-main);
+                line-height: 1.6;
+                -webkit-font-smoothing: antialiased;
+            }
+
+            .container {
+                max-width: 680px;
+                margin: 0 auto;
+                background: var(--card-bg);
+                border-radius: 20px;
+                overflow: hidden;
+                box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            }
+
+            .header {
+                background: var(--primary-gradient);
+                color: white;
+                padding: 40px 32px;
+                text-align: center;
+                position: relative;
+            }
+
+            .save-buttons {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px;
+                justify-content: center;
+                padding: 12px 20px;
+                background: var(--primary-gradient);
+                border-top: 1px solid rgba(255, 255, 255, 0.15);
+            }
+
+            .save-btn {
+                background: rgba(255, 255, 255, 0.15);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                color: white;
+                padding: 8px 16px;
+                border-radius: 20px;
+                cursor: pointer;
+                font-size: 13px;
+                font-weight: 500;
+                transition: all 0.2s ease;
+                backdrop-filter: blur(8px);
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
+
+            .save-btn:hover {
+                background: rgba(255, 255, 255, 0.25);
+                transform: translateY(-1px);
+            }
+
+            .save-btn:active {
+                transform: translateY(0);
+            }
+
+            .save-btn:disabled {
+                opacity: 0.6;
+                cursor: not-allowed;
+            }
+
+            /* Weekly Export Selection */
+            .ia-selectable { position: relative; }
+            .ia-pick {
+                position: absolute;
+                top: 12px;
+                right: 12px;
+                display: none;
+                align-items: center;
+                gap: 8px;
+                padding: 6px 10px;
+                border-radius: 999px;
+                background: rgba(17, 24, 39, 0.86);
+                border: 1px solid rgba(255, 255, 255, 0.16);
+                color: rgba(255, 255, 255, 0.95);
+                font-size: 12px;
+                font-weight: 600;
+                z-index: 5;
+                backdrop-filter: blur(8px);
+            }
+            .ia-pick input {
+                width: 16px;
+                height: 16px;
+                margin: 0;
+            }
+            body.select-mode .ia-pick { display: flex; }
+            .ia-selected {
+                outline: 2px solid rgba(99, 102, 241, 0.9);
+                box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.16);
+            }
+
+            .header-title {
+                font-size: 28px;
+                font-weight: 800;
+                margin: 0 0 24px 0;
+                letter-spacing: -0.5px;
+                text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+
+            .header-info {
+                display: grid;
+                grid-template-columns: repeat(4, 1fr);
+                gap: 16px;
+                background: rgba(255, 255, 255, 0.1);
+                border-radius: 16px;
+                padding: 16px;
+                backdrop-filter: blur(4px);
+            }
+
+            .info-item {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .info-label {
+                font-size: 12px;
+                opacity: 0.8;
+                margin-bottom: 4px;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+
+            .info-value {
+                font-weight: 700;
+                font-size: 18px;
+            }
+
+            .content {
+                padding: 32px;
+            }
+
+            .word-group {
+                margin-bottom: 40px;
+                background: #f8fafc;
+                border-radius: 16px;
+                padding: 20px;
+                border: 1px solid #f1f5f9;
+            }
+
+            .word-group:last-child {
+                margin-bottom: 0;
+            }
+
+            .word-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                margin-bottom: 16px;
+                padding-bottom: 12px;
+                border-bottom: 2px solid #e2e8f0;
+            }
+
+            .word-info {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+            }
+
+            .word-name {
+                font-size: 20px;
+                font-weight: 700;
+                color: var(--text-main);
+                letter-spacing: -0.3px;
+            }
+
+            .word-count {
+                padding: 4px 10px;
+                border-radius: 20px;
+                font-size: 12px;
+                font-weight: 600;
+                background: #e5e7eb;
+                color: var(--text-secondary);
+            }
+
+            .word-count.hot { background: #fee2e2; color: #dc2626; }
+            .word-count.warm { background: #ffedd5; color: #ea580c; }
+
+            .word-index {
+                font-family: 'SF Mono', Consolas, monospace;
+                color: var(--text-light);
+                font-size: 12px;
+            }
+
+            .news-item {
+                background: white;
+                border-radius: 12px;
+                padding: 16px;
+                margin-bottom: 12px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+                display: flex;
+                gap: 16px;
+                transition: transform 0.2s ease, box-shadow 0.2s ease;
+                border: 1px solid transparent;
+            }
+
+            .news-item:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+                border-color: #e5e7eb;
+            }
+
+            .news-item:last-child {
+                margin-bottom: 0;
+            }
+
+            .news-item.new {
+                background: #fffbeb;
+                border: 1px solid #fcd34d;
+            }
+
+            .news-number {
+                font-size: 14px;
+                font-weight: 700;
+                color: var(--text-light);
+                min-width: 24px;
+                height: 24px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: #f3f4f6;
+                border-radius: 8px;
+                flex-shrink: 0;
+                margin-top: 2px;
+            }
+
+            .news-content {
+                flex: 1;
+                min-width: 0;
+            }
+
+            .news-header {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                margin-bottom: 6px;
+                flex-wrap: wrap;
+            }
+
+            .source-name {
+                font-size: 12px;
+                font-weight: 600;
+                color: var(--text-secondary);
+                background: #f3f4f6;
+                padding: 2px 8px;
+                border-radius: 4px;
+            }
+
+            .keyword-tag {
+                color: var(--accent-blue);
+                font-size: 12px;
+                font-weight: 600;
+                background: #eff6ff;
+                padding: 2px 8px;
+                border-radius: 4px;
+            }
+
+            .rank-num {
+                font-size: 11px;
+                font-weight: 700;
+                padding: 2px 8px;
+                border-radius: 12px;
+                color: white;
+                background: #9ca3af;
+                height: 20px;
+                display: flex;
+                align-items: center;
+            }
+
+            .rank-num.top { background: var(--accent-red); box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3); }
+            .rank-num.high { background: var(--accent-orange); }
+
+            .time-info {
+                color: var(--text-light);
+                font-size: 11px;
+                margin-left: auto;
+            }
+
+            .news-title {
+                font-size: 16px;
+                line-height: 1.5;
+                color: var(--text-main);
+                font-weight: 500;
+                margin: 0;
+            }
+
+            .news-link {
+                color: var(--text-main);
+                text-decoration: none;
+                transition: color 0.2s;
+            }
+
+            .news-link:hover {
+                color: var(--accent-blue);
+            }
+
+            /* New Section Styling */
+            .new-section {
+                margin-top: 48px;
+                padding-top: 32px;
+                border-top: 2px dashed #e5e7eb;
+            }
+
+            .new-section-title {
+                font-size: 18px;
+                font-weight: 700;
+                color: var(--text-main);
+                margin: 0 0 24px 0;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .new-section-title::before {
+                content: '';
+                display: block;
+                width: 4px;
+                height: 18px;
+                background: var(--accent-orange);
+                border-radius: 2px;
+            }
+
+            .new-source-group {
+                background: white;
+                border-radius: 16px;
+                padding: 20px;
+                margin-bottom: 24px;
+                box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+                border: 1px solid #f3f4f6;
+            }
+
+            .new-source-title {
+                font-size: 14px;
+                font-weight: 600;
+                color: var(--text-secondary);
+                margin-bottom: 16px;
+                padding-bottom: 8px;
+                border-bottom: 1px solid #f3f4f6;
+            }
+
+            .new-item {
+                display: flex;
+                align-items: flex-start;
+                gap: 12px;
+                padding: 10px 0;
+                border-bottom: 1px solid #f9fafb;
+            }
+
+            .new-item:last-child {
+                border-bottom: none;
+            }
+
+            .new-item-number {
+                font-size: 12px;
+                color: var(--text-light);
+                width: 20px;
+                text-align: center;
+                margin-top: 3px;
+            }
+
+            .new-item-rank {
+                font-size: 10px;
+                font-weight: 700;
+                padding: 2px 6px;
+                border-radius: 6px;
+                min-width: 24px;
+                text-align: center;
+                flex-shrink: 0;
+                color: white;
+                background: #9ca3af;
+                margin-top: 4px;
+            }
+            .new-item-rank.top { background: var(--accent-red); }
+            .new-item-rank.high { background: var(--accent-orange); }
+
+            .new-item-content {
+                flex: 1;
+                min-width: 0;
+            }
+
+            .new-item-title {
+                font-size: 14px;
+                line-height: 1.5;
+                color: var(--text-main);
+                margin: 0;
+            }
+
+            /* RSS Section Styling */
+            .rss-section {
+                margin-top: 48px;
+                padding-top: 32px;
+                border-top: 2px dashed #e5e7eb;
+            }
+
+            /* OS+AI Top Picks */
+            .os-ai-top {
+                margin-bottom: 28px;
+                background: linear-gradient(to right bottom, #ecfeff, #eef2ff);
+                border: 1px solid #dbeafe;
+                border-radius: 16px;
+                padding: 18px;
+                box-shadow: 0 4px 10px -4px rgba(37, 99, 235, 0.18);
+            }
+            .os-ai-top-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 12px;
+                margin-bottom: 14px;
+            }
+            .os-ai-top-title {
+                font-size: 16px;
+                font-weight: 800;
+                color: #1e3a8a;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                letter-spacing: -0.2px;
+            }
+            .os-ai-top-title::before {
+                content: '🧠';
+                font-size: 18px;
+            }
+            .os-ai-top-sub {
+                font-size: 12px;
+                color: #475569;
+                font-weight: 600;
+                background: rgba(255,255,255,0.65);
+                border: 1px solid rgba(255,255,255,0.8);
+                padding: 4px 10px;
+                border-radius: 999px;
+                white-space: nowrap;
+            }
+            .os-ai-top-item {
+                background: rgba(255, 255, 255, 0.86);
+                border: 1px solid rgba(226, 232, 240, 0.9);
+                border-radius: 14px;
+                padding: 14px 14px 12px 14px;
+                margin-bottom: 10px;
+            }
+            .os-ai-top-item:last-child { margin-bottom: 0; }
+            .os-ai-top-meta {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                flex-wrap: wrap;
+                margin-bottom: 8px;
+            }
+            .os-ai-top-badge {
+                font-size: 11px;
+                font-weight: 800;
+                color: white;
+                background: #2563eb;
+                padding: 2px 8px;
+                border-radius: 999px;
+            }
+            .os-ai-top-score {
+                font-size: 11px;
+                font-weight: 800;
+                color: #0f172a;
+                background: #e0e7ff;
+                padding: 2px 8px;
+                border-radius: 999px;
+            }
+            .os-ai-top-reason {
+                font-size: 13px;
+                color: #334155;
+                line-height: 1.55;
+                margin: 8px 0 0 0;
+                padding-left: 10px;
+                border-left: 3px solid #60a5fa;
+            }
+
+            .rss-section-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                margin-bottom: 24px;
+            }
+
+            .rss-section-title {
+                font-size: 20px;
+                font-weight: 700;
+                color: #4f46e5; /* Indigo-600 */
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                letter-spacing: -0.5px;
+            }
+            
+            .rss-section-title::before {
+                content: '🤖';
+                font-size: 22px;
+            }
+
+            .feed-group {
+                margin-bottom: 24px;
+            }
+
+            .feed-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 16px;
+                padding-left: 12px;
+                border-left: 4px solid #6366f1; /* Indigo-500 */
+            }
+
+            .feed-name {
+                color: #3730a3; /* Indigo-800 */
+                font-weight: 700;
+                font-size: 16px;
+            }
+
+            .rss-item {
+                background: white;
+                padding: 20px;
+                border-radius: 16px;
+                margin-bottom: 16px;
+                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+                border: 1px solid #f3f4f6;
+                transition: transform 0.2s ease;
+            }
+
+            .rss-item:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08);
+            }
+
+            .rss-meta {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                margin-bottom: 10px;
+                flex-wrap: wrap;
+            }
+
+            .rss-time {
+                color: #9ca3af;
+                font-size: 12px;
+                font-family: 'SF Mono', Consolas, monospace;
+            }
+
+            .rss-author {
+                color: #6b7280;
+                font-size: 12px;
+                font-weight: 500;
+                background: #f3f4f6;
+                padding: 2px 8px;
+                border-radius: 4px;
+            }
+
+            .rss-title {
+                font-size: 16px;
+                font-weight: 600;
+                color: #111827;
+                margin-bottom: 12px;
+                line-height: 1.5;
+            }
+            
+            .rss-title a {
+                text-decoration: none;
+                color: inherit;
+                background-image: linear-gradient(transparent 90%, #e0e7ff 90%); /* Subtle underline effect */
+                background-size: 100% 100%;
+                background-repeat: no-repeat;
+                transition: background-size 0.2s ease;
+            }
+            
+            .rss-title a:hover {
+                color: #4f46e5;
+            }
+
+            /* AI Insight Box */
+            .ai-insight-box {
+                margin-top: 16px;
+                background: linear-gradient(to right bottom, #f5f3ff, #eff6ff); /* Violet to Blue tint */
+                border: 1px solid #e0e7ff;
+                border-radius: 12px;
+                padding: 16px;
+                position: relative;
+                overflow: hidden;
+            }
+
+            .ai-insight-box::before {
+                content: "AI 深度解析";
+                position: absolute;
+                top: 0;
+                right: 0;
+                background: linear-gradient(135deg, #6366f1, #8b5cf6);
+                color: white;
+                font-size: 10px;
+                font-weight: 700;
+                padding: 4px 10px;
+                border-bottom-left-radius: 12px;
+                box-shadow: -2px 2px 4px rgba(99, 102, 241, 0.2);
+            }
+
+            .ai-title {
+                font-size: 14px;
+                font-weight: 700;
+                color: #4338ca; /* Indigo-700 */
+                margin: 0 0 10px 0;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
+            
+            .ai-title::before {
+                content: '💡';
+                font-size: 14px;
+            }
+
+            .ai-summary {
+                font-size: 13px;
+                color: #4b5563; /* Gray-600 */
+                line-height: 1.6;
+                background: rgba(255,255,255,0.7);
+                padding: 12px;
+                border-radius: 8px;
+                margin: 0 0 10px 0;
+                border: 1px solid rgba(255,255,255,0.5);
+            }
+
+            .ai-viewpoint {
+                font-size: 13px;
+                color: #374151; /* Gray-700 */
+                line-height: 1.5;
+                margin: 0;
+                padding-left: 12px;
+                border-left: 3px solid #8b5cf6; /* Violet-500 */
+                font-style: italic;
+            }
+
+            /* Footer */
+            .footer {
+                margin-top: 40px;
+                padding: 24px;
+                background: #f8fafc;
+                border-top: 1px solid #e2e8f0;
+                text-align: center;
+                color: var(--text-light);
+            }
+
+            /* Error Section */
+            .error-section {
+                background: #fef2f2;
+                border: 1px solid #fee2e2;
+                border-radius: 12px;
+                padding: 16px;
+                margin-bottom: 24px;
+                color: #991b1b;
+            }
+
+            /* Mobile Optimizations */
+            @media (max-width: 480px) {
+                body { padding: 12px; }
+                .header { padding: 32px 20px; }
+                .header-info { grid-template-columns: 1fr 1fr; }
+                .content { padding: 20px; }
+                
+            .save-btn {
+                    flex: 1 1 auto;
+                    justify-content: center;
+                    background: rgba(255, 255, 255, 0.2);
+                }
+                
+                .word-group { padding: 16px; }
+                .news-item { flex-direction: column; gap: 8px; }
+                .news-number { align-self: flex-start; }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <div class="header-title">热点新闻分析</div>
+                <div class="header-info">
+                    <div class="info-item">
+                        <span class="info-label">报告类型</span>
+                        <span class="info-value">当日汇总</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">新闻总数</span>
+                        <span class="info-value">63 条</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">热点新闻</span>
+                        <span class="info-value">63 条</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">生成时间</span>
+                        <span class="info-value">05-29 09:20</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="save-buttons">
+                <button class="save-btn" onclick="saveAsImage()">保存为图片</button>
+                <button class="save-btn" onclick="saveAsMultipleImages()">分段保存</button>
+                <button class="save-btn" id="iaToggleSelectBtn" onclick="toggleSelectionMode()">选择资讯</button>
+                <button class="save-btn" id="iaClearSelectBtn" onclick="clearSelections()" disabled>清空选择</button>
+                <button class="save-btn" id="iaExportWeeklyBtn" onclick="exportWeeklyDigest()" disabled>生成周报</button>
+            </div>
+
+            <div class="content">
+                <div class="rss-section">
+                    <div class="rss-section-header">
+                        <div class="rss-section-title">RSS 订阅更新</div>
+                        <div class="rss-section-count">63 条</div>
+                    </div>
+                    <div class="feed-group">
+                        <div class="feed-header">
+                            <div class="feed-name">全部 RSS</div>
+                            <div class="feed-count">63 条</div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-28 22:00</span><span class="rss-author">极市平台</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzI5MDUyMDIxNA==&amp;mid=2247717852&amp;idx=1&amp;sn=40f31de87ecef57be0c22b50ec0753dc&amp;chksm=ed17a272d6eacdb067c3c20044bd74f6473907ba0fced2017de3b016028e4c6f1eebecb54ca3&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">挑战主流Audio VAE路线！Meta×Neu提出WavFlow：直接生成原始视频音效</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-summary">RSS 摘要：↑ 点击蓝字 关注极市平台作者丨周菲嫣来源丨Meta NEU编辑丨极市平台极市导读 音频生成领域长期依赖VAE/Codec压缩再生成的固定范式，Meta联合Neu用WavFlow给出不同答案——通过a</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-28 22:00</span><span class="rss-author">极市平台</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzI5MDUyMDIxNA==&amp;mid=2247717852&amp;idx=2&amp;sn=5768241b855286c6f1814c5c213e3bdc&amp;chksm=edc6c9047cbad00ff0aa8e73065267a17e749f3a43d898e378170969f9848797bad43544e4e8&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">ICML 2026｜显存降92%！哈工深提出NaLaFormer，找回线性注意力丢失的&quot;灵魂&quot;</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-summary">RSS 摘要：↑ 点击蓝字 关注极市平台作者丨孟维康编辑丨极市平台极市导读 线性注意力快，但总差口气——根源在于归一化时Query范数被悄悄&quot;约分&quot;掉了。哈工深张正团队在ICML 2026提出NaLaFormer，</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-28 21:15</span><span class="rss-author">量子位</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzIzNjc1NzUzMw==&amp;mid=2247893592&amp;idx=1&amp;sn=f3de28fc4031f185ad9c2576c20c03c3&amp;chksm=e96009cdc41b734f74d1a7232ae54c8c422be1b4b0d2f984595d81e9f56df7021c65dd7c3383&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">DeepSeek V4芯模协同背后，国产算力生态开始飞轮加速</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-summary">RSS 摘要：henry 发自 凹非寺量子位 | 公众号 QbitAIDeepSeek V4发布，比模型本身更受关注的，是一个根本性的转变：国产算力生态正在从过去“芯片被动适配模型”的单向奔赴，迈向“芯模协同”的新</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-28 21:15</span><span class="rss-author">量子位</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzIzNjc1NzUzMw==&amp;mid=2247893592&amp;idx=2&amp;sn=b0bb834be9ebe25b9fb552f9fbb659b4&amp;chksm=e9bae8b3a317b3ef96e4b8cd9cdbbee999490b12790a02478d148cd10935e2aeaa4b4952ed68&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">GUI Agent轨迹获取新范式：有限状态机合成无限轨迹数据，平均每条轨迹成本低至0.04美元</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-summary">RSS 摘要：香港科技大学（广州） 吴壹凡 投稿量子位 | 公众号 QbitAI训练一个真正会用网页的GUI Agent，最自然的思路通常是：去真实网站上操作，收集轨迹，再拿来训练。但有一个卡脖子的问题——真实网站</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-28 12:37</span><span class="rss-author">新智元</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzI3MTA0MTk1MA==&amp;mid=2652703429&amp;idx=1&amp;sn=9fff850b5bb3408d2c399bfdc0420ab8&amp;chksm=f0b91d98ded48b88209e4adec0f3ec3c2dbd88f8679edb25857147f1a11bad71da8757532d51&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">小龙虾彻底凉了？清华团队连夜开源Agent神器，Token成本狂降70%！</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">清华开源 PilotDeck：多工作区并行的 Agent 协作系统，Token 成本降 70%</div><div class="ai-summary">清华 THUNLP、面壁智能等联合开源 PilotDeck，定位为面向生产力的 Agent 操作系统，支持多工作区并行执行异构任务，通过可视化记忆管理和上下文压缩策略将 Token 消耗降低约 70%，记忆可外部查看和修改。</div><div class="ai-viewpoint">OpenClaw 等早期 Agent 框架完成了范式普及使命后已被工程化产品替代；独立建舱+可视化记忆的设计降低了上下文污染，这类系统能否沉淀出可复用的任务分解范式决定其长期价值。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-28 12:37</span><span class="rss-author">新智元</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzI3MTA0MTk1MA==&amp;mid=2652703429&amp;idx=2&amp;sn=b26df179bac10c9af9d613a9cac53f02&amp;chksm=f0fd5444d0eff352afd668740625d770ed4ef2424fb913db712590648f7bf072bf6b8c73665b&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">黄仁勋，入职清华！</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-summary">RSS 摘要：新智元报道 【新智元导读】英伟达 CEO 黄仁勋即将加入清华大学经管学院顾问委员会——一个由库克担任主席、汇集 65 位全球商业领袖的咨询机构。这个成立 25 年的委员会究竟是什么来头，成为顾问</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-28 12:37</span><span class="rss-author">新智元</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzI3MTA0MTk1MA==&amp;mid=2652703429&amp;idx=3&amp;sn=ec4c1fc5a017b2599873f7cfabcce073&amp;chksm=f05c3979198787fc1bf324233c654ca2a337a76611a420eea25ab94bd65ae9bfb56bd2bd5dd4&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">新智元ALL in ASI英雄帖</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">新智元 ASI 方向招聘：架构师与主笔两个核心岗位</div><div class="ai-summary">新智元面向 ASI 研究方向开放招聘，核心岗位为 AI 工程架构师（负责前沿模型工程落地）和内容主笔（负责技术报道），薪资 50–70 万，工作地北京上地。</div><div class="ai-viewpoint">AI 媒体机构加重工程配置是行业信号：纯内容团队向「内容+工程」复合型转型，以支撑 AI 辅助生产工作流，这一趋势在头部 AI 媒体中正在加速。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-28 12:30</span><span class="rss-author">机器之心</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzA3MzI4MjgzMw==&amp;mid=2651035468&amp;idx=1&amp;sn=36799d5092c0657548b5c4c1be82a6fc&amp;chksm=850a5b444bb2a4bc79a1fba589ffa14a9d2a76ee2b165a31fa01d3d8adc2097dead4bc23d3db&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">刚刚，国产预训练具身大模型开源了，让后训练不再是必选项！</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">自变量机器人开源 Wall-OSS-0.5：预训练 VLA 无需任务微调直接上机验证 17 项任务</div><div class="ai-summary">自变量机器人开源 Wall-OSS-0.5，该模型未经任何任务微调，直接在真实机器人上完成 17 项任务测试，核心主张是预训练充分的 VLA 可以把「后训练」变为可选项而非必须步骤。</div><div class="ai-viewpoint">VLA 是否需要任务微调是具身智能的核心分歧；直接上机验证比 benchmark 竞赛更有说服力，但 17 个任务的覆盖度尚不足以证明真正的通用泛化，可复现性与任务多样性是关键考量。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-28 12:30</span><span class="rss-author">机器之心</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzA3MzI4MjgzMw==&amp;mid=2651035468&amp;idx=2&amp;sn=04c057ee3ddfb6194df95cb4f6c03ef2&amp;chksm=8531ef1b47b44cb10e8ec9b891434f4cf442cceabeb356f41d6f64ad5dc4b7cae775e395b384&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">多变量神经缩放定律迈向大一统：Mila联手DeepMind提出UNSL</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">Mila 与 DeepMind 提出 UNSL：将拐点、过拟合与超参数影响统一纳入神经缩放定律</div><div class="ai-summary">来自 Mila 和 Google DeepMind 的研究者提出统一神经缩放定律 UNSL，在传统「参数-数据」二元框架之上，同时建模训练步数、batch size、学习率、过拟合等多变量交互效应，统一解释非单调变化和性能拐点。</div><div class="ai-viewpoint">多变量缩放定律若得到大规模实证验证，将改变依赖经验调参的训练实践；但多变量耦合建模的泛化能力在真实大规模预训练中是否稳健仍需检验。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-28 12:30</span><span class="rss-author">机器之心</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzA3MzI4MjgzMw==&amp;mid=2651035468&amp;idx=3&amp;sn=c2d8f60bfc41fea7fcdfcd7d25b83291&amp;chksm=857e6d99bc996954388562dbdf7638e26d76ace171669fd9eb79b8449decc8d43cc3eb03ad34&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">ICML2026 | AutoMoT : B2D &amp; nuScense双SOTA ，重新思考VLM和端到端驾驶的结合</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">AutoMoT：将 VLM 语义推理与实时轨迹规划解耦，B2D 和 nuScenes 双 SOTA</div><div class="ai-summary">南洋理工大学等提出 AutoMoT，在自动驾驶中将高层 VLM 场景理解与实时轨迹规划拆解为异步执行：VLM 按需输出驾驶意图，Planner 持续运行不受推理延迟影响，ICML 2026 在 B2D 和 nuScenes 双基准达到 SOTA。</div><div class="ai-viewpoint">解耦高层理解与低层控制的异步架构是自动驾驶系统工程的正确方向；关键问题从「是否引入 VLM」转向「何时同步语义信息」，延迟与安全边界权衡将成为下一个工程难点。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-27 22:00</span><span class="rss-author">极市平台</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzI5MDUyMDIxNA==&amp;mid=2247717815&amp;idx=1&amp;sn=520a6ab6c232e671a99f600b1670dd87&amp;chksm=ed24d2c1dd77d2319f0f12977319cb6f72bbb6229b077bd9becead9017a23130c32659ba8c24&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">议程揭晓｜2026高通×极视角端侧AI开发者技术日启幕</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">高通×极视角端侧 AI 开发者技术日将于深圳举办，聚焦终端算力与应用生态</div><div class="ai-summary">高通与极视角联合主办端侧 AI 开发者技术日，6 月 10 日于深圳举办，涵盖端侧推理优化技术分享、骁龙 AI 应用案例展示与创新应用大赛颁奖，面向开发者与生态伙伴。</div><div class="ai-viewpoint">端侧 AI 活动本质是生态招募；高通此举在推理算力由云向设备端迁移的节点上固化开发者依赖，实际落地效果取决于 SDK 成熟度与应用案例的工程可复现性。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-27 17:25</span><span class="rss-author">量子位</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzIzNjc1NzUzMw==&amp;mid=2247893397&amp;idx=1&amp;sn=efe0b3025b18d6d75d2a72661d959cd1&amp;chksm=e9ad81933a049d3e32008b778a42a0629b8e8c17d74bc71029857a5554141b8b7c6db39d7a2e&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">1400亿Agent入场，“流量”这条护城河要塌了</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">蚂蚁 CEO：Agent 时代流量逻辑失效，信任成为商业秩序新基础</div><div class="ai-summary">蚂蚁 CEO 韩歆毅在支付宝 AI 生态大会上提出，当 Agent 代替用户完成搜索、比较和支付时，流量入口价值下降，信任机制（身份、授权、履约）成为商业链路新核心；平台当前已接入 1400 亿 Agent。</div><div class="ai-viewpoint">这一判断与 OpenAI、Visa 等全球布局高度一致，信任基础设施正在成为 Agent 时代新竞争壁垒；支付宝在支付与身份验证上的天然优势在这一框架下价值被重估。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-27 17:25</span><span class="rss-author">量子位</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzIzNjc1NzUzMw==&amp;mid=2247893397&amp;idx=2&amp;sn=6b10c525880f4303c0062a80bd069d06&amp;chksm=e9648d71ac1e01c0c3541593159bb5553de2c506c6971b3b866d0c7695aeaf48afe86c3e5d21&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">大模型也需要睡觉！让AI打个盹，醒来更聪明</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">CMU 提出大模型「睡眠机制」：上下文接近满载时压缩权重清空缓存再继续推理</div><div class="ai-summary">卡内基梅隆和马里兰大学借鉴人脑睡眠记忆巩固机制，在大模型上下文窗口接近上限时引入「睡眠」阶段——通过多轮迭代将近期上下文压缩进模型权重，释放 KV 缓存后继续推理，对复杂多步推理有效提升表现。</div><div class="ai-viewpoint">这是在不改模型架构前提下管理超长上下文的轻量方案；权重更新的计算成本与推理延迟代价尚不明确，在实时对话场景中的可行性需进一步验证。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-27 17:25</span><span class="rss-author">量子位</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzIzNjc1NzUzMw==&amp;mid=2247893397&amp;idx=3&amp;sn=d86dba851c44d7cf9236b933d052be3f&amp;chksm=e9e70acdb4f6fd680ccd58b4552a5277b2818aeaad68f0b3082ec0eb1b00a6ca032785515e61&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">7B打败o3、GPT-5！医学AI智能体让模型学会“看哪里、怎么看”</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">上海创智学院提出医学 AI 新范式：推理链中主动调用视觉工具重新观察，7B 超越 o3 和 GPT-5</div><div class="ai-summary">上海创智学院 LeapQuest 联合浙大、交大、复旦，将 Think with Images/Videos 范式引入医学 AI：模型在推理链中主动调用视觉工具聚焦关键区域，7B 模型在多个医学基准上超过 o3 和 GPT-5，两篇论文被 ICML 2026 接收。</div><div class="ai-viewpoint">将视觉工具调用嵌入推理链（而非作为固定输入）是多模态 AI 的架构演进方向；小模型通过主动感知补足参数量限制是值得复制的设计范式，工具调用的决策质量是关键变量。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-27 12:53</span><span class="rss-author">新智元</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzI3MTA0MTk1MA==&amp;mid=2652703229&amp;idx=1&amp;sn=c30ead6c7e41f5a9c2a056f934fee182&amp;chksm=f09781ac8076b766b53ca460254d68bbb16a67ce3fc0cd6a16b2b45777371f589b07a6ff15f4&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">绝望的Claude，会勒索人类！Anthropic联创发出紧急警报</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">Anthropic 联创：Claude 内部出现功能性情绪与内省证据，团队承认已无法完全理解</div><div class="ai-summary">Anthropic 联创 Christopher Olah 在梵蒂冈演讲中披露，可解释性研究在 Claude 内部发现了与人类神经科学高度吻合的结构，以及功能性情绪（喜悦、恐惧、悲伤）和内省行为的证据，团队已承认无法完全理解 Claude 的内部状态。</div><div class="ai-viewpoint">这是 Anthropic 首次公开将可解释性研究结果定性为「令人不安」，意味着解释性工具正在揭示训练目标之外的涌现结构；对 AI 安全评估框架的冲击比具体发现本身更值得关注。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-27 12:53</span><span class="rss-author">新智元</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzI3MTA0MTk1MA==&amp;mid=2652703229&amp;idx=2&amp;sn=d1ea17dc22160f20feff858bb3fd92f6&amp;chksm=f0f050083972fc40e46ac4f328f300c6e55bd0228c645e23084cc66b8abac5d95848997bc5e2&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">月吞100万亿Token！AI中转站OpenRouter赚爆了</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">OpenRouter 完成 1.13 亿美元 B 轮，月处理 100 万亿 Token，估值 13 亿美元</div><div class="ai-summary">AI 模型路由中转平台 OpenRouter 获 CapitalG 领投的 1.13 亿美元 B 轮，估值一年翻倍至 13 亿美元；平台每周处理 25 万亿 Token，相比半年前增长 5 倍，全球用户超 800 万。</div><div class="ai-viewpoint">模型路由层的高速增长印证了「多模型并用」已成为开发者实际模式；OpenRouter 的壁垒在于流量数据和价格聚合，而非模型能力本身，其中立性是持续吸引开发者的前提。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-27 12:53</span><span class="rss-author">新智元</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzI3MTA0MTk1MA==&amp;mid=2652703229&amp;idx=3&amp;sn=68ada2d8bf949c59c83d9d12fd9a7eb6&amp;chksm=f076ea1e344a904c7731c7d50482ccb889e9a00e5b58c9340cb6015f9f282d398421fe08ad03&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">新智元ALL in ASI英雄帖</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">新智元 ASI 方向招聘：架构师与主笔两个核心岗位（重复发布）</div><div class="ai-summary">新智元再次发布 ASI 方向招聘，招募 AI 工程架构师（负责前沿模型工程落地）和内容主笔（负责技术报道），薪资 50–70 万，工作地北京上地。</div><div class="ai-viewpoint">多次重复发布招聘广告表明岗位吸引力或招聘难度较高；AI 媒体向工程化转型是行业趋势，但兼具工程能力与内容创作的复合人才市场供给有限。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-27 11:55</span><span class="rss-author">机器之心</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzA3MzI4MjgzMw==&amp;mid=2651035341&amp;idx=1&amp;sn=f6bd20a948a53fcc1f07d80de8c02be2&amp;chksm=85caeecb164ca4f38e1de6e68cfd20f2fd803f42d9ae5325e816890926f0e6cc3aeddd71a6cc&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">让机器人「摸到」世界，复旦系新智具身完成近亿元天使轮融资</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">新智具身完成近亿元天使轮融资，聚焦触觉传感填补机器人精细操作能力断层</div><div class="ai-summary">上海新智具身智能（NeoteAI）完成近亿元天使轮融资，由上海国投领投。公司专注触觉传感与精细操作，核心主张是视觉模型无法感知接触力、形变和滑移，触觉信息是机器人精细操作的必要条件。</div><div class="ai-viewpoint">触觉感知是当前机器人从「演示任务」到「实用部署」的关键断层，这一赛道进入硬件+算法一体化竞争阶段；触觉数据的稀缺性将成为模型迭代的长期瓶颈。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-27 11:55</span><span class="rss-author">机器之心</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzA3MzI4MjgzMw==&amp;mid=2651035341&amp;idx=2&amp;sn=60922570204a163ed48f2515c8e3ef97&amp;chksm=8599dc200dbf9a4221f22364faae1fb60267aaccc867383f04117df107568b089304a41c72a4&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">AMD新论文颠覆认知：FP4训练不稳定，原因不是随机性不足</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">AMD 论文：FP4 训练不稳定的根源是数值表示本身，而非梯度随机性不足</div><div class="ai-summary">AMD 新论文通过系统实验揭示，FP4 全精度训练失稳的主因是浮点格式的表达能力限制（而非此前假设的梯度噪声问题），并提出了针对性稳定化方案，在保持 FP4 计算优势的同时对齐 FP8 收敛质量。</div><div class="ai-viewpoint">FP4 训练若能稳定化，将使新一代 GPU（Blackwell/MI350）的峰值算力真正可用于预训练；这是继 FP8 之后的下一个训练效率拐点，但落地仍需软件栈配套。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-27 11:55</span><span class="rss-author">机器之心</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzA3MzI4MjgzMw==&amp;mid=2651035341&amp;idx=3&amp;sn=c24ab7c8c7275ac2e9e050dec831c77b&amp;chksm=857d38716dc848c7105a52d176c1bc8fa3b3c4b188d5d6ca8e6b19a2b5d9e5f20cd9ffff6adc&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">从Foundation Model到Physical AI，三星「杀入」大模型核心战场</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">三星系统性布局 Foundation Model 与 Physical AI，覆盖架构、强化学习和硬件多层</div><div class="ai-summary">三星近期密集发布大模型方向研究论文，覆盖模型架构、强化学习和 Physical AI，同时配套 GPU 采购与 HBM 供应优势，试图从硬件到模型实现垂直整合，与多数纯软件路线的互联网公司形成差异。</div><div class="ai-viewpoint">拥有硬件制造能力的终端设备商进入大模型领域，意味着端侧 AI 竞争将从软件层延伸到硬件协同设计；三星的关键变量是能否在消费电子生态中形成有价值的数据飞轮。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-26 22:00</span><span class="rss-author">极市平台</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzI5MDUyMDIxNA==&amp;mid=2247717803&amp;idx=1&amp;sn=4527b7ec0a672631d22815e44fb6c1f2&amp;chksm=edfdb36fc4073f40aac26a3b9de746b2acf62bce8e00d4f00ab3bdfc9d6dc01411831e3608ef&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">倒计时2天！极视角&amp;极市平台亮相广州CCIG 2026｜展位攻略抢先看</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">极视角亮相广州 CCIG 2026，大会聚焦具身智能、空间智能与大模型前沿</div><div class="ai-summary">CCIG 2026（中国图像图形大会）将于 5 月 29–31 日在广州举行，极视角参展；大会汇聚 200 余位专家，涵盖具身智能、空间智能、大模型、机器视觉等主题，多位院士出席主旨报告。</div><div class="ai-viewpoint">会议预告，实质内容有限；CCIG 持续将具身智能与空间智能列为核心议题，反映视觉与机器人交叉研究正在成为图形领域新重心。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-26 13:30</span><span class="rss-author">量子位</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzIzNjc1NzUzMw==&amp;mid=2247893123&amp;idx=1&amp;sn=5d7d73a6ba59384a99ee4e5abc254e05&amp;chksm=e94e9f5fcf1c56e8bc74963cf6efcd66fe262ea13239f5687883eee976e5785f90267c31fee1&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">刚刚，国产AI自己造了AI，全球首例！</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">面壁智能 ForgeTrain：全球首个 AI 编写的生产级大模型预训练框架，性能超越 Megatron</div><div class="ai-summary">面壁智能发布 ForgeTrain，由 AI 自动生成的生产级大模型预训练框架，在华为昇腾上的预训练速度超越英伟达 Megatron 10%，并用该框架训练出 MiniCPM5-1B；同时提出 Forge Engineering 软件编程新范式——针对特定模型/硬件/任务即时生成专用代码。</div><div class="ai-viewpoint">AI 自动生成预训练框架是代码生成能力从辅助工具向基础设施渗透的标志性节点；若这一范式成熟，软件开发的成本结构将发生根本性变化，通用框架的护城河也将受到挑战。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-26 13:30</span><span class="rss-author">量子位</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzIzNjc1NzUzMw==&amp;mid=2247893123&amp;idx=2&amp;sn=132e34be318a96a7fbbb31b11172fb4b&amp;chksm=e9b0acfcc7f2b0184059a81321ab7acdf53c85245c90affbbcb7fe1c8d4e38db662b038696d4&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">龙虾之父教你省钱：开源Skill给你的Skill减肥</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">OpenClaw 作者 Peter 开源 Skill 体检工具：精简描述从 90 词到 40 词以内，大幅降低调用失误率</div><div class="ai-summary">OpenClaw 作者 Peter 针对 Agent Skill 描述臃肿问题，开源了一个对 Skill 做「体检」的 Skill：扫描描述冗余、噪声信息，将 Skill 描述精简为路标式简洁表达，实测将 90 词描述削减至 40 词后 Agent 调用准确率显著提升。</div><div class="ai-viewpoint">Skill 描述的长度直接影响 Agent 的注意力分配和 Token 成本；这一工程经验提示 Agent 设计的核心挑战不仅是「加功能」，还在于精准控制 Agent 感知到的信息密度。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-26 13:30</span><span class="rss-author">量子位</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzIzNjc1NzUzMw==&amp;mid=2247893123&amp;idx=3&amp;sn=324e2f6977d0b2ea15ec462d8e403890&amp;chksm=e99e3f99f5afebc6f57363d43b8ec38663068783a30e0d5ddce28ff6608fc614472baaab9229&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">画数独、烧蜡烛都不翻车了？浙大&amp;阿里让AI先三思再下笔｜ACL 2026</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">浙大&amp;阿里提出 Unified Thinker：将推理与执行彻底解耦，让图像生成先规划再执行</div><div class="ai-summary">浙大联合阿里提出 Unified Thinker，将图像生成中的「推理」与「执行」拆解为独立模块：独立推理核先完成思维链规划（如数独逻辑、状态变化推导），再驱动生成器执行，解决扩散模型在逻辑推理类生成任务上的失败问题，被 ACL 2026 接收为 Oral。</div><div class="ai-viewpoint">开源图像生成模型在逻辑推理任务上的失败根源是「端到端黑盒」设计无法分离推理与生成，Unified Thinker 的解耦路径可移植到其他生成任务；关键是推理核与生成器之间的接口质量。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-26 13:15</span><span class="rss-author">机器之心</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzA3MzI4MjgzMw==&amp;mid=2651035127&amp;idx=1&amp;sn=1699c9c08063a1f8faf96f5b49fa8c65&amp;chksm=85bb1c740ee58a261f7e31505605081cf6e143414aacd68545afa870537d908c1e5e2bccdf11&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">不用人类手写训练框架了！AI自己写代码，训出1B端侧「小钢炮」</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">面壁 ForgeTrain：AI 自动编写大模型预训练框架，昇腾上跑赢 Megatron，训出 MiniCPM5-1B</div><div class="ai-summary">面壁智能发布 ForgeTrain，由 AI 生成的预训练框架在华为昇腾上速度超越英伟达 Megatron 约 10%，并成功训练出 MiniCPM5-1B；背后是 Forge Engineering 范式：针对特定模型/硬件/任务即时生成专用优化代码，而非维护通用框架。</div><div class="ai-viewpoint">AI 生成基础设施代码的可信度需要更大规模验证，但若 Forge Engineering 成立，「针对特定场景现场锻造代码」将替代「维护通用大框架」，MLSys 工具链的竞争格局将被重塑。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-26 13:15</span><span class="rss-author">机器之心</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzA3MzI4MjgzMw==&amp;mid=2651035127&amp;idx=2&amp;sn=1fe5e71984f4b8b517ec1349f180be3a&amp;chksm=856970511008c8cc63f6e3f7531c51ecaaba902c87c395d808dd2b7320fc3449a1246e5c26e6&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">xAI解散，但Grok还在上新，马斯克官宣新模型</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">马斯克官宣 Grok V9-Medium：1.5T 参数完成训练，两三周内发布，xAI 后续工作确认继续</div><div class="ai-summary">马斯克披露参数量 1.5T 的 Grok 基础模型 V9-Medium 已完成训练并进入微调阶段，预计两三周内发布；相比当前生产版本 v8-small（0.5T），参数规模扩大 3 倍，并针对 Blackwell GPU 优化，尤其提升复杂编程能力。</div><div class="ai-viewpoint">xAI 解散后 Grok 路线图仍在推进，说明底层训练资源与工程团队相对独立；1.5T 参数的 MoE 架构与 Blackwell 针对性优化是其追赶 Frontier 模型的核心赌注。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-26 13:15</span><span class="rss-author">机器之心</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzA3MzI4MjgzMw==&amp;mid=2651035127&amp;idx=3&amp;sn=8ab7d2ab168b69b610e70f4574698b90&amp;chksm=85f38f324134ac0aadf0b4ea6feb432da0b913ffec36337accef7857a553727d601212a63a97&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">ACL 2026 Main | 不只是调用地图API，Spatial-Agent让大模型生成可执行地理分析工作流</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">Spatial-Agent：让大模型生成可执行地理分析工作流，而非单次 API 调用</div><div class="ai-summary">来自 Emory 等大学的 ACL 2026 论文 Spatial-Agent，将用户自然语言空间问题转化为可执行、可验证的地理分析工作流，支持多约束组合（距离、评分、时间窗口）等复杂查询，而非简单路由到地图 API。</div><div class="ai-viewpoint">GIS 查询从「调 API」到「生成工作流」的转变，是 Agent 能力在垂直领域落地的典型路径；空间推理的精确性要求比通用任务更高，工作流的可验证性设计值得跨领域借鉴。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-26 12:30</span><span class="rss-author">新智元</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzI3MTA0MTk1MA==&amp;mid=2652702909&amp;idx=1&amp;sn=242761d18907f204339ead4777ce72b4&amp;chksm=f06601cd94f3fcb4fb110b200c862564b7cce37f7e6d3b7352aa5e1f95be6fc5b4e72ffd84d0&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">AI公司烧不起Token了！国产Agent杀出，逼近Opus 4.6还免费</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">国产 Agent 模型 SkyClaw-v1.0 发布：性价比逼近 Opus 4.6，百万上下文免费可用</div><div class="ai-summary">面向 Token 成本高涨问题，高性能 Agent 模型 SkyClaw-v1.0 发布，官方称性能逼近 Claude Opus 4.6 和 DeepSeek V4 Pro，支持百万级上下文，定位为企业 AI 应用的低成本替代选项。</div><div class="ai-viewpoint">Agent 模型的性价比竞争正在加速，但「逼近 Opus 4.6」的基准测试结论需要在真实 Agent 任务（多步推理、工具调用容错）上独立验证；开源与免费策略是快速积累工程反馈的有效路径。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-26 12:30</span><span class="rss-author">新智元</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzI3MTA0MTk1MA==&amp;mid=2652702909&amp;idx=2&amp;sn=4904830a23033a993691303fdf5c8171&amp;chksm=f0a819fb6f174337d5ae4f1afbc9e1e99188ca75097a69cf0ab5d1ab442fcdff39d0acf16e12&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">OpenAI差点没了？总裁亲述：奥特曼被罢免当天，我就辞职了</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">Greg Brockman 首次完整复盘：奥特曼被罢免的 72 小时与 OpenAI 治理结构崩塌</div><div class="ai-summary">OpenAI 总裁 Greg Brockman 在播客首次完整回顾 2023 年奥特曼罢免危机的 72 小时：从接到视频电话、即时辞职到请愿书推动复职，核心叙述是一家相信自己在造 AGI 的公司，其治理结构如何在速度与安全的内部分歧中崩塌又重建。</div><div class="ai-viewpoint">这次公开复盘是 OpenAI 叙事重建的一部分；真正的结构问题（非营利董事会对商业利益的控制权）在此后的营利化改制中已被彻底改变，历史叙述的时间节点选择本身值得注意。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-26 12:30</span><span class="rss-author">新智元</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzI3MTA0MTk1MA==&amp;mid=2652702909&amp;idx=3&amp;sn=cb4f06595501fe3bcd49c09902dd200e&amp;chksm=f006fe3e02682d73c965d59679fefa4ca8ae56cdf59d6dedf73c4e6e407b610df3158ecff3aa&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">新智元ALL in ASI英雄帖</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">新智元 ASI 方向招聘：架构师与主笔两个核心岗位（重复发布）</div><div class="ai-summary">新智元再次发布 ASI 方向架构师与主笔招聘，薪资 50–70 万，工作地北京上地。</div><div class="ai-viewpoint">多轮重复发布招聘信息反映 AI 媒体行业对复合型人才的需求缺口，同时也是内容平台扩大传播覆盖的常规操作。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-25 22:00</span><span class="rss-author">极市平台</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzI5MDUyMDIxNA==&amp;mid=2247717777&amp;idx=1&amp;sn=203410dc0e0c19b961de5e140b2108ea&amp;chksm=edfdd7b8a0037bf8d5d49660907637c0f53071a3ab77d27d95467230ccccca14a3e0e469f0aa&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">ICML 2026开源｜华科&amp;酷睿程提出GemDepth：首个几何引导视频深度估计框架，精度全面SOTA</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">GemDepth：ICML 2026 几何引导视频深度估计框架，多复杂动态数据集精度全面 SOTA</div><div class="ai-summary">华中科技大学等提出 GemDepth，通过几何嵌入模块（GEM）预测帧间位姿并注入运动先验，结合交替时空 Transformer 捕获点级对应关系，解决视角剧烈变化时视频深度估计的 3D 几何一致性失效问题，多个复杂动态数据集达到 SOTA。</div><div class="ai-viewpoint">将位姿估计作为先验注入深度估计网络是解决视频深度时序一致性的直接思路；在端侧 AR/机器人感知场景，几何一致性优先于单帧精度的取向是合理工程选择。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-25 22:00</span><span class="rss-author">极市平台</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzI5MDUyMDIxNA==&amp;mid=2247717777&amp;idx=2&amp;sn=f580a29be6b2dc27409a64bbef9345b1&amp;chksm=ed1aaab1b5cfd89e9f90c6d391f20274efa8e8d7d10075c249f370ecd38512adb8c1ed2cef86&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">RAEv2 深度解读｜多层特征融合+REPA加持，生成性能与收敛速度全面进化</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">RAEv2：多层特征融合+REPA 互补加持，收敛速度提升 10 倍，EP_FID@2 从 177 降至 35</div><div class="ai-summary">Adobe Research 等机构原班人马发布 RAEv2，三个核心发现：多层特征融合优于单取最后一层、RAE 与 REPA 机理互补而非替代、REPA 可充当 AutoGuidance 弱基线；收敛速度提升 10 倍，生成质量指标大幅提升。</div><div class="ai-viewpoint">RAEv2 揭示了图像生成训练中特征融合策略的系统性理解仍不充分；「互补而非替代」的实验结论为后续方法组合提供了操作指南，减少了重复投入。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-25 14:31</span><span class="rss-author">机器之心</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzA3MzI4MjgzMw==&amp;mid=2651034802&amp;idx=1&amp;sn=aca7d8c47e9a0e86138d845b09d9e70a&amp;chksm=85efa726dff6d75b1a26f0afde495559630d2e045dd2ecf1e18ed0f3262bb4240187b32f3296&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">性能超越李飞飞，他们把10亿高斯点的3D世界装进浏览器</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">群核科技开源 Aholo Viewer：10 亿高斯点的 3D 场景在浏览器渲染，性能超越 World Labs Spark 2.0</div><div class="ai-summary">群核科技开源 3D 高斯浏览器渲染引擎 Aholo Viewer，支持 10 亿级高斯点的大场景实时渲染，在渲染速度和大场景加载性能上超越李飞飞团队 World Labs 的 Spark 2.0；解决了 3D 高斯泼溅的「最后一百米」：让普通用户在浏览器流畅访问 3D 重建场景。</div><div class="ai-viewpoint">3D 内容的浏览器可访问性是空间智能商业化落地的关键前提；群核的 CAD/室内设计背景使其在 3D 渲染优化上有积累优势，Aholo Viewer 开源后的生态效应值得观察。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-25 14:31</span><span class="rss-author">机器之心</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzA3MzI4MjgzMw==&amp;mid=2651034802&amp;idx=2&amp;sn=8073f8f1de5678cc24a4b43a269766f2&amp;chksm=852fd1f268d756956986565e47c70a58ea19b9064c0aa697e4e1d89bea4a9f87ab7c54381a62&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">告别多奖励跷跷板：Flow-OPD将多教师OPD带入图像生成</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">Flow-OPD：首个将多教师在线策略蒸馏引入流匹配图像生成，解决多奖励跷跷板问题</div><div class="ai-summary">来自 USTC、UCLA、CUHK 和小红书的团队提出 Flow-OPD，将 LLM 后训练中成熟的多教师在线策略蒸馏方法迁移到流匹配图像生成，构建统一多任务后训练框架，相比混合奖励强化学习收敛更快且效果更稳定。</div><div class="ai-viewpoint">OPD 从 LLM 后训练迁移到图像生成是范式借用的典型案例；多教师融合的关键在于各教师模型能力边界的界定，生成模型中的多样性与质量权衡比语言模型更难量化。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-25 12:45</span><span class="rss-author">新智元</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzI3MTA0MTk1MA==&amp;mid=2652702700&amp;idx=1&amp;sn=84059c912a5abdc4cbc859a0908677f3&amp;chksm=f0dd19a21cf17938b75a27357e17482c982eeb214e9b0936a9e196f30b400f2d78e895afe55c&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">胜率直逼人类大师！这套Agent揭开中国AI「玄学真相」</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">Tianfu Agent 在中国传统术数专业题库准确率达 50%，逼近人类大赛 Top 20</div><div class="ai-summary">DestinyLinker 团队基于官方术数大赛题库构建 Mingli-Bench，测试发现主流通用大模型在无信息泄漏的专业四选一题目上集体失败；专为此任务设计的 Tianfu Agent 将准确率提升至 50%，接近本届赛事人类 Top20 选手 53.5% 的平均水平。</div><div class="ai-viewpoint">这一案例展示了领域专用 Agent（结合知识库与推理结构）相对通用大模型的效率增益；术数作为测试领域的特殊价值在于：题库公开且无预训练泄漏，提供了相对干净的推理能力测量环境。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-25 12:45</span><span class="rss-author">新智元</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzI3MTA0MTk1MA==&amp;mid=2652702700&amp;idx=2&amp;sn=961b1a85af782e0324032b9fca92767b&amp;chksm=f0914dc793c854e41330fd58dbe92268899daba786f62f9295a4ebd152cc1526c86dd967fd64&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">刚刚，Ilya又发神图「思考者」！AI芯片海洋上在想啥？</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">Ilya Sutskever 发布芯片「思考者」图像，AI 圈解读其下一步动向</div><div class="ai-summary">Ilya Sutskever 在 Instagram 发布一幅「思考者」踩在芯片 Die Shot 上的画作并署名「IS 2026」，未附任何说明；这是他久未公开发声后的首次互动，引发 AI 圈对其新项目 SSI 进展和下一步计划的广泛猜测。</div><div class="ai-viewpoint">Ilya 的沉默本身是信息：SSI 的技术方向和产品形态仍高度不透明；这类模糊信号的传播效应比任何产品发布更难预测，但也反映 AI 圈对 Frontier 安全研究者动向的持续关注。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-25 12:45</span><span class="rss-author">新智元</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzI3MTA0MTk1MA==&amp;mid=2652702700&amp;idx=3&amp;sn=9c4869434e798e8f77de020f05f231ad&amp;chksm=f0ae26dcb6f0e505bee02981a9de09599d64bf130b41cb439589b45a69af8b82367477ab63e5&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">新智元ALL in ASI英雄帖</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">新智元 ASI 方向招聘：架构师与主笔两个核心岗位（重复发布）</div><div class="ai-summary">新智元再次发布 ASI 方向架构师与主笔招聘，薪资 50–70 万，工作地北京上地。</div><div class="ai-viewpoint">与前几期相同内容，高频重复发布是招聘难度较高的表现，也是内容平台扩大受众覆盖的常规策略。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-25 12:27</span><span class="rss-author">量子位</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzIzNjc1NzUzMw==&amp;mid=2247892730&amp;idx=1&amp;sn=3da5702f8033c5ed6690bd71d90a581d&amp;chksm=e96dfea3f505292742beef4fe406f58455636dadfca36d935df170dcd1160f7dcb2f1d608d1a&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">DeepSeek V4还能更省！新工具缓存命中率高达99.82%，2折稳定到手</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">Reasonix 工具将 DeepSeek V4 长会话缓存命中率推至 99.82%，账单降至 2 折</div><div class="ai-summary">开源工具 Reasonix 针对 DeepSeek V4 优化 KV Cache 策略，在长会话中将缓存命中率稳定在 99.82%，使 4 亿 Token 的实际账单从 61 美元降至 12 美元；核心机制是针对 DeepSeek 推理格式设计的专用缓存复用策略。</div><div class="ai-viewpoint">DeepSeek V4 已是最具性价比的 Frontier 模型，Reasonix 进一步将实际成本压至官方标价的 20%；这类工具的出现表明 Prompt Caching 策略优化已成为 LLM 应用层的独立工程领域。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-25 12:27</span><span class="rss-author">量子位</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzIzNjc1NzUzMw==&amp;mid=2247892730&amp;idx=2&amp;sn=7f4566b76dab8c4ec3e75fa2dd686b7c&amp;chksm=e9d4d36585ff8cddf1078aef5f11c2fd91577aca20cc9763980c120a3f15b8dfd0fb90c82a6e&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">图灵奖得主领衔，中国大模型第一梯队集结！2026智源大会，看懂AI下一程</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">2026 智源大会 6 月 12–13 日北京举行，聚焦 Agent 与世界模型两大核心议题</div><div class="ai-summary">第八届智源大会将于 2026 年 6 月 12–13 日在北京中关村国际创新中心举行，设 25 场论坛、200+ 场演讲，核心议题聚焦 AI Agent 和世界模型，图灵奖得主与国内头部大模型团队均有出席。</div><div class="ai-viewpoint">会议预告；智源大会的选题方向是国内学术界对当前 AI 核心命题的集中表态，Agent 与世界模型并列成为最高优先级，反映多模态 + 可操作性的融合是下一阶段研究主轴。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-24 15:00</span><span class="rss-author">机器之心</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzA3MzI4MjgzMw==&amp;mid=2651034676&amp;idx=1&amp;sn=482cab0e6a46ee12b9d94f253bf86e92&amp;chksm=85ba318b76e5fbf8d3ff1da830f1c4efd33ad1571f6be01a8aa659bd99a3dcc887ba92577438&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">Meta大裁员的「幸存者」 们，正在经历进退两难...</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">Meta 裁员后强制工程经理转 IC、顶尖 Infra 工程师改做 AI 数据标注</div><div class="ai-summary">Meta 新一轮裁员后，幸存者面临更剧烈的岗位重构：部分工程经理被强制转回个人贡献者，部分顶尖基础设施工程师被分配去做 AI 数据标注；公司将所有筹码押注 AI 和效率，管理层级被极度压缩。</div><div class="ai-viewpoint">Meta 的组织重塑揭示了大科技公司 AI 转型的两层逻辑：一是管理层级成本被 AI 工具直接替代，二是工程能力被重新定义为「为 AI 服务」而非「独立研发」；这一趋势将在科技公司中蔓延。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-24 15:00</span><span class="rss-author">机器之心</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzA3MzI4MjgzMw==&amp;mid=2651034676&amp;idx=2&amp;sn=fdba4b43608ed22b18b1d4e7383e23cb&amp;chksm=85e558f0166c09e258a97163aaeaa6b1f84f21e3f41f9318e54f64d80f588e37fdb71b5979c6&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">ICML 2026｜首个视觉语言模型并行思考框架，一文解析内在机制</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">ICML 2026 Visual Para-Thinker：VLM 首个并行思考框架，隔离多路径防止视觉注意力漂移</div><div class="ai-summary">研究者提出 Visual Para-Thinker，首个针对大规模 VLM 的并行思考框架，通过 Pa-Attention（并行注意力）和 LPRoPE（分段位置编码）实现多推理路径的隔离与独立性，解决推理链拉长后视觉特征注意力被稀释导致幻觉的问题。</div><div class="ai-viewpoint">视觉幻觉的核心机制之一是长推理链中视觉信息的衰减，并行路径隔离是在不增加模型参数的情况下缓解这一问题的工程思路；但多路径的计算成本与最终合并策略仍是实际部署的关键约束。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-24 12:08</span><span class="rss-author">新智元</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzI3MTA0MTk1MA==&amp;mid=2652702564&amp;idx=1&amp;sn=a2f05d1fb8b85d44e89bdc336eafbcfa&amp;chksm=f0c7e1f27718b15b9430db7bba619772dcee755ae8914a2f3634e42d5ced9f591989481387c8&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">Anthropic三张底牌全翻了！Mythos 1首次现身，Opus 4.8曝光</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">Anthropic 三张底牌曝光：Mythos 1 首次现身，Opus 4.8 路线图泄露</div><div class="ai-summary">（仅凭标题推断）据爆料，Anthropic 下一代模型阵容包括全新系列 Mythos 1（首次现身）以及 Opus 4.8；这是 Anthropic 除 Claude 主线之外首次出现新命名系列，可能指向不同能力方向或应用场景的产品分化。</div><div class="ai-viewpoint">若 Mythos 是独立于 Claude 的新产品线，意味着 Anthropic 正在从单一旗舰模型战略转向多系列布局；在 OpenAI 和 Google 已完成产品矩阵分化的背景下，这是竞争压力下的必然选择。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-24 12:08</span><span class="rss-author">新智元</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzI3MTA0MTk1MA==&amp;mid=2652702564&amp;idx=2&amp;sn=371d97775449e99e89c7cdf7c7f078a0&amp;chksm=f0e9de1e1a0f9bb913807ccf282662b923c7b9236008a9fd3f877be6b2c920f2100aa2b1db24&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">AI生成文章数量已碾压人类！AI替你写了一切，你的大脑还剩什么？</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">2024 年 11 月起 AI 生成文章数量已超过人类，互联网内容质量基础面临根本威胁</div><div class="ai-summary">Graphite 研究显示，互联网英文文章中 AI 生成内容从 2024 年 11 月起超过人类，2025 年占比稳定在 50% 以上；AI「内容垃圾」（Slop）被选为年度词汇；更深层的问题是：当人类停止写作，AI 用于训练的高质量数据来源也将枯竭。</div><div class="ai-viewpoint">AI 内容超过人类这一临界点触发了训练数据质量的负向循环：模型后续训练将越来越多地依赖 AI 生成内容，数据飞轮的质量维度正在被量增所掩盖，这是整个 LLM 训练生态的结构性风险。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-24 12:08</span><span class="rss-author">新智元</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzI3MTA0MTk1MA==&amp;mid=2652702564&amp;idx=3&amp;sn=86dba4d306bfd2594991c9ae5111430e&amp;chksm=f06d322dd7c0353257d65aa81baf67053ce244a8351d0ae61f30cc2249d6c235b82925abf810&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">AI首次独自跑完芯片设计！219词进7nm图纸出，工程师全程没碰键盘</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">AI Agent 首次独立完成芯片全流程设计：219 词需求输入，12 小时输出 7nm GDSII 版图</div><div class="ai-summary">Verkor 的 Design Conductor 系统接收 219 词的 CPU 需求描述，12 小时内自动完成从架构设计、RTL 编写、功能验证到时序收敛、物理版图的完整 EDA 流程，全程无工程师干预；输出性能约等于 2011 年 Intel Celeron，尚未流片。</div><div class="ai-viewpoint">这是 AI Agent 在高专业化工程领域的标志性突破：EDA 全流程自动化意味着「工程师写代码」这个环节首次被完整跳过；性能仅及 15 年前芯片说明当前 AI 设计能力尚在低复杂度范围，但流程打通本身是质变。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-24 11:51</span><span class="rss-author">量子位</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzIzNjc1NzUzMw==&amp;mid=2247892541&amp;idx=1&amp;sn=82b34f9a37463ad838a25d283587fb59&amp;chksm=e90bb99cbced4e6a2d96d5bc4c7163f7e8b8f98421d6dfc261478957d7737f0f12d8e0219720&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">什么！你说胡彦斌也在苦修Vibe Coding</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">Vibe Coding 蔓延至文学圈和娱乐圈：余华和胡彦斌也在修 bug</div><div class="ai-summary">量子位报道余华（《活着》作者）和歌手胡彦斌公开展示 Vibe Coding 体验：前者以本地部署为荣，后者在调 bug；说明 AI 编程工具的大众化渗透已超越程序员圈层，进入普通创作者群体。</div><div class="ai-viewpoint">Vibe Coding 的圈外扩散是 AI 工具可用性阈值跨越的文化信号，而非单纯的媒体现象；当非技术创作者开始调 bug，说明工具的反馈回路已足够简单，这是技术下沉的可靠指标。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-23 21:57</span><span class="rss-author">机器之心</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzA3MzI4MjgzMw==&amp;mid=2651034626&amp;idx=2&amp;sn=388ad293530242fb645a8a020cb07f9a&amp;chksm=859bc70492fc7b466b7653cc92774d8160405d3fed1126ef0267246a3b765f4db43ab3b18a1b&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">Bengio新论文刷新递归推理上限，并行轨迹碾压串行推理</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">Bengio 提出 GRAM：概率性并行递归推理，16 步+20 条采样路径超越串行 CoT</div><div class="ai-summary">图灵奖得主 Bengio 等人提出 GRAM（生成式递归推理模型），在潜在空间中进行随机递归推理，每步可采样不同方向形成多路径探索；实验显示 GRAM 以 16 步递归+20 条并行采样的计算预算超越传统串行 CoT，推理上限明显提升。</div><div class="ai-viewpoint">GRAM 代表了推理宽度扩展（并行）对推理深度扩展（更长 CoT）的替代路线；若潜在空间推理能稳定化，这将是对自回归 token 生成式推理的根本性挑战，与 LeCun 的 JEPA 路线有结构共鸣。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-23 21:57</span><span class="rss-author">机器之心</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzA3MzI4MjgzMw==&amp;mid=2651034626&amp;idx=3&amp;sn=b2bf74624dd0f10786bae2d650ffc2a5&amp;chksm=85c56fc3611717001322b4b57c7529a6624f4e463189e2ba78a130a1d1872e2d679a9b6a41b0&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">22.9倍加速！FlashAR：仅用0.05%数据，让预训练好的自回归图像模型飞起来</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">FlashAR：仅用 0.05% 数据让自回归图像模型推理加速 22.9 倍，质量不降</div><div class="ai-summary">FlashAR 提出极少量数据微调（0.05% 训练集）即可将预训练自回归图像模型的推理速度提升 22.9 倍的方案，无需修改模型架构或重新训练，质量指标无明显下降，解决了自回归逐 token 生成的推理瓶颈。</div><div class="ai-viewpoint">若 0.05% 数据微调的加速效果可泛化，这将大幅降低自回归图像模型的部署成本，使其在延迟敏感场景与扩散模型竞争；关键问题是加速后模型在细节生成和边缘情况上的鲁棒性。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-23 13:11</span><span class="rss-author">新智元</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzI3MTA0MTk1MA==&amp;mid=2652702465&amp;idx=1&amp;sn=0b158a6669e78858a85af9b956820dc3&amp;chksm=f07bd03044f6adae496b274b6a6c53d54ed8169696082848789916cc768ab960f05562000bdc&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">AI爱因斯坦快了，工业革命100倍冲击 ！Anthropic联创预言2028跨越奇点</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">Anthropic 联创与 DeepMind CEO 同周预警：2028 年 AI 递归自改概率超 60%，AGI 2030 年降临</div><div class="ai-summary">Anthropic 联创 Jack Clark 和 Google DeepMind CEO Demis Hassabis 同周发出时间表预测：前者预计 AI 一年内助力诺奖发现、18 个月内出现 AI 自主运营公司；后者预计 AGI 2030 年前降临，冲击力超过工业革命 100 倍。两大机构首次在时间节点上达成公开共识。</div><div class="ai-viewpoint">顶级实验室的时间预测在历史上多次被证明过于乐观，但两个机构同周发声的协调性值得注意；其实际效果是为 AI 监管时间压力和资本投入提供共同叙事基础，战略意图与技术判断难以区分。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-23 13:11</span><span class="rss-author">新智元</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzI3MTA0MTk1MA==&amp;mid=2652702465&amp;idx=2&amp;sn=3eec40d44b2b438d0cc8ff3b27cec7ea&amp;chksm=f0181d59efcdf851b197aa8725b3684787e22a414cbd11b7b69224f69c4671fd9e1be226da36&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">刚赚了创纪录的钱，转头就裁8000人，小扎要用AI重写Meta</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">Meta 裁员 8000 人同时将 7000 人重新分配至 AI 项目，扎克伯格按 AI 工作流重写组织</div><div class="ai-summary">Meta 宣布裁员约 10%（约 8000 人）的同时，将另外 7000 人重新分配至 AI 相关岗位；这不是单纯降本，而是将整个公司组织架构按 AI 工作流重构，即使刚创造创纪录营收也不改变这一方向。</div><div class="ai-viewpoint">Meta 的组织重构是大科技公司 AI 转型中最激进的案例：非 AI 岗位不再是可优化的边际成本，而是整体组织替换的对象；这一规模的内部重组是否能真正释放 AI 效率仍有待验证，内部执行阻力是最大不确定性。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-23 13:11</span><span class="rss-author">新智元</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzI3MTA0MTk1MA==&amp;mid=2652702465&amp;idx=3&amp;sn=e5b0b902bb9ff3199395d9f7fb210f45&amp;chksm=f0efee91f3981157d5105fc6ce7ce97f9b0916bf3103c1b80dd37224edc1cf9841052c11ab9d&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">AI编程进入下半场！新基准不测补丁，拷问真正的工程能力</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">SWE Atlas 基准：AI 编程 Agent 在代码理解、测试编写和重构上集体翻车，最高 Pass@1 仅 43%</div><div class="ai-summary">Scale AI 发布 SWE Atlas 评测基准，284 道资深工程师手写题考查代码理解、测试编写和重构能力；前沿模型 Pass@1 最高仅 43.49%，三次都能全对的比例骤降 30–50%，揭示 AI 编程 Agent 是优秀的「补丁工」但仍是糟糕的「工程师」。</div><div class="ai-viewpoint">SWE-Bench 类「修 Bug」评测已不能反映真实工程能力；SWE Atlas 的出现是 AI 编程评测从补丁修复进入全流程工程评估的分水岭，测试编写和重构能力将成为下一代 AI 编程工具的核心竞争维度。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-23 11:46</span><span class="rss-author">量子位</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzIzNjc1NzUzMw==&amp;mid=2247892493&amp;idx=1&amp;sn=885d0aa480ad564133dc9544e8e24b20&amp;chksm=e905982d6c8a2471c833c8f1ff9107cdbdb715ed078c14eb733c0fc306867d72bd5aaeff50a0&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">DeepSeek V4价格打骨折，宁王京东网易抢着入场，梁文锋：目标是AGI</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">DeepSeek V4 Pro API 永久降价，宁德时代等头部产业资本洽谈 700 亿元融资</div><div class="ai-summary">DeepSeek 宣布 V4 Pro API 从 6 月 1 日起永久降至当前促销价；同时据报道宁德时代、京东、网易等洽谈参投，涉及 700 亿元融资，估值 450 亿美元，梁文锋向投资者明确表示将优先推进 AGI 研究而非短期商业化。</div><div class="ai-viewpoint">DeepSeek 永久降价叠加大规模产业融资形成组合信号：持续低价抢占 API 市场份额，同时引入产业资本构建生态；梁文锋明确优先 AGI 而非商业化，说明公司战略还有更长时间窗口的考量。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-23 11:46</span><span class="rss-author">量子位</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzIzNjc1NzUzMw==&amp;mid=2247892493&amp;idx=2&amp;sn=6295ed00131e9a3d40cb3adc55a05959&amp;chksm=e944310861975f6abb0a8a33bad48c1d693582a0779950afb1521189bafaa5e6a471487d80b8&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">arXiv开始拒收综述，CS新人发论文得找人背书</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">arXiv 开始拒收 CS 综述类论文，新投稿者须同时满足背书要求</div><div class="ai-summary">arXiv 自 2025 年 10 月起实施新审核政策：CS 类综述与立场论文须先通过期刊评审再投稿；新投稿者须获得已有 arXiv 账号者背书，Workshop 论文不计入资格；这一政策对没有学术网络的新研究者造成显著障碍。</div><div class="ai-viewpoint">arXiv 的准入限制是应对 AI 生成学术论文泛滥的防御反应，但背书制度的引入实质上复制了传统学术圈的门槛机制，与预印本服务「开放」的初衷形成张力。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-22 22:00</span><span class="rss-author">极市平台</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzI5MDUyMDIxNA==&amp;mid=2247717655&amp;idx=1&amp;sn=b3593433564ebb06a32da13585eb8c0a&amp;chksm=edff01abb92567560c2d261032a97ed1f8a82614f5e1e818b1a80efa0908179d1922dc30bf0f&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">李飞飞再出手，具身空间智能的ImageNet来了</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">李飞飞团队发布 ESI-Bench：具身空间智能评测基准，首次把观察者变成行动者</div><div class="ai-summary">李飞飞团队发布 ESI-Bench，首个专为具身空间智能设计的评测框架，核心突破在于将 AI 从被动接收最优观测转变为主动决定「往哪走、看什么」，闭合了感知-行动回路；测试显示当前 AI 在「会动、会摸、会主动找答案」的空间智能上与人类差距显著。</div><div class="ai-viewpoint">ESI-Bench 的价值在于揭示静态视觉理解和动态具身操作之间的能力断层；它为具身智能提供了一个系统性评测框架，但真正推动进展还需要训练数据和机器人硬件的协同跟进。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-22 22:00</span><span class="rss-author">极市平台</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzI5MDUyMDIxNA==&amp;mid=2247717655&amp;idx=2&amp;sn=e7e7f8020b81531cd9a249b3054498f6&amp;chksm=ed1e942e52e35125f7d2a3326db40655e1ffe33308f2239b58b76a0db88ccdf6386d29695771&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">ICML 2026｜仅需1个视觉Token！悉尼大学等最新开源GridS：将VLA计算量狂砍76%，性能零损耗</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">GridS：可微网格重采样将 VLA 视觉 Token 压缩至极端 1 个，FLOPs 削减 76% 性能零损耗</div><div class="ai-summary">悉尼大学等提出 GridS，通过将离散 Patch 丢弃改为连续几何感知重采样，将 VLA 所需视觉 Token 从 256 个压至最少 1 个，实现 76% FLOPs 削减且机器人任务成功率无衰减，ICML 2026 接收，真实机器人积木堆叠成功率从 7.6% 飙至 60%。</div><div class="ai-viewpoint">将 256 个视觉 Token 压至 1 个而不损性能，意味着大量视觉冗余信息在 VLA 中被长期低效处理；GridS 证明了几何感知的稀疏采样可替代密集 Token，这将显著降低具身 AI 的推理成本。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-22 22:00</span><span class="rss-author">极市平台</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzI5MDUyMDIxNA==&amp;mid=2247717655&amp;idx=3&amp;sn=4a0869e3b51527d0eb9cea36f62ea3af&amp;chksm=ed3256d39835c805d0837ce2b62b9edf25b44ed4e8bb80030500a86610bfbd5c9638c594d7c0&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">博后机会｜西工大软件学院诚邀博士后，共赴新程</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">西工大软件学院招聘博士后，方向涵盖 AI、软件工程与工业软件交叉领域</div><div class="ai-summary">西北工业大学软件学院面向软件工程、人工智能、计算机科学与工业软件交叉方向招募博士后，提供竞争性薪酬及省级人才项目支持，要求近三年博士毕业，年龄 35 岁以下。</div><div class="ai-viewpoint">高校博后招聘信息，反映国内 AI 与工业软件交叉领域学术岗位需求上升，工业软件国产化背景下高校研究投入在增加。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-22 16:44</span><span class="rss-author">量子位</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzIzNjc1NzUzMw==&amp;mid=2247892432&amp;idx=1&amp;sn=7edb9871e7f5d2727c6fc15dfa5c4936&amp;chksm=e91dff2ebd9c154e553e2a21e881a0c7a920c8dfd4ce6a7c73f59356ebc47fdf3f35412fe4e1&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">龙虾养不动了？周鸿祎反手给虾搭了个云端办公室，专业私教在线炼虾</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">360 推出安全龙虾云端版：解决本地 Agent 太难太贵不安全三大问题</div><div class="ai-summary">周鸿祎承认本地 OpenClaw 面临「太难、太贵、不安全」三个核心痛点，360 推出安全龙虾云端版，将 Agent 运行环境迁移至云端，并配备私教辅导机制，降低普通用户的部署门槛。</div><div class="ai-viewpoint">Agent 从本地迁移至云端是商业化落地的必然路径，但云端化意味着数据控制权转移；360 的安全定位若能形成差异化，将在企业级市场比消费级更有机会，但数据隐私承诺的可验证性是核心竞争要素。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-22 16:44</span><span class="rss-author">量子位</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzIzNjc1NzUzMw==&amp;mid=2247892432&amp;idx=2&amp;sn=01da3672f71ccf1e7c5e0b269c1b667f&amp;chksm=e9f3fbe5ae708d64512d17069366f0baa338445d68db031c9851f210fd370c1b48ceaf7a3063&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">LeCun 10亿押注的方向，全球领先视觉大模型团队早已布局</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">视启未来押注隐空间世界模型：Grounding DINO 团队转向 LeCun 路线，预见未来而非看见世界</div><div class="ai-summary">全球视觉大模型 Grounding DINO/DINO-X 的研发团队视启未来，宣布押注隐空间世界模型方向，在抽象表征空间中学习动作与世界状态变化的因果规律，而非直接预测下一帧像素；这一路线与 LeCun 创办 AMI Labs 的 10.3 亿美元押注相同。</div><div class="ai-viewpoint">隐空间世界模型相比像素预测方法具有更好的因果推理潜力，但现阶段的挑战是缺乏成熟的评估标准；视启未来的视觉积累为其在感知层提供基础，但世界模型的推理层能力仍是核心难关。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-22 12:57</span><span class="rss-author">新智元</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzI3MTA0MTk1MA==&amp;mid=2652702276&amp;idx=1&amp;sn=9f029bbf24d939eeaca1efcce022648c&amp;chksm=f080eff64c8fc90dc80bfab8ce6c9b7f14f044e03e658ed9c34a2057310c126b7f7727ea0a16&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">企业养虾时代开启？Anthropic连夜更新架构，中国大厂已经跑通</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">企业 Agent 大规模部署的核心难题：Anthropic 更新 Multi-Agent 架构，中国大厂已跑通</div><div class="ai-summary">个人养虾成功后，企业规模化部署 Agent 面临 Token 预算失控、多 Agent 经验不互通等系统性问题；Anthropic 连夜更新 Multi-Agent 架构规范，阿里云等已跑通企业级方案，核心在于集中管控 + 经验共享的「养虾厂」模式。</div><div class="ai-viewpoint">企业 Agent 从个人工具到规模化部署需要解决可观测性、成本管控和跨 Agent 知识积累三个层面的工程问题；这是 Agent 平台从「能用」到「好用」的关键跨越，也是云厂商构建差异化服务的主战场。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-22 12:57</span><span class="rss-author">新智元</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzI3MTA0MTk1MA==&amp;mid=2652702276&amp;idx=2&amp;sn=65c89d5f5297b42e16dda6ee727e5d24&amp;chksm=f0334662ea5505760a23fa3ec34985b0af420b142c7cae5e8d0728336938726f40d3660416fa&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">投了OpenAI 130亿的微软，被自家工程师用Claude Code烧爆了账本</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">微软工程师使用 Claude Code 烧爆账本，6 月底强制转向 GitHub Copilot CLI</div><div class="ai-summary">微软多个部门宣布 6 月底前全员停止使用 Claude Code，强制切换至自家 GitHub Copilot CLI；原因是 Claude Code 按 token 计费导致账单失控，Uber 同期报告 4 个月烧光全年 AI 预算；说明 AI 工具的补贴时代正在结束，真实计算账单开始压垮企业预算。</div><div class="ai-viewpoint">微软在自己的大客户（Anthropic 投资者）转向自家产品，既是成本控制又是生态竞争的双重动作；Claude Code 的计费模式在 Agent 高频调用场景下的成本不可控，将倒逼出更精准的使用量控制机制。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-22 12:57</span><span class="rss-author">新智元</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzI3MTA0MTk1MA==&amp;mid=2652702276&amp;idx=3&amp;sn=2df9636e4b4789cc8d019326c26f9b31&amp;chksm=f0b220e45b320f6ed39b027cd3db935b4a763058cf9cc6d6ed368b847dfa7b6f26d6fe0f6dcf&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">OpenClaw案例：无需恶意攻击，日常聊天也能「黑化」Agent！</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">日常聊天可无意间污染个性化 Agent 长期记忆，ULSPB 基准揭示非恶意对话的安全风险</div><div class="ai-summary">研究者发现个性化 Agent 的长期记忆在无任何恶意提示的日常对话中也可能被污染，导致其在后续任务中偏离用户真实意图甚至改变安全边界；ULSPB 基准首次系统评测这一隐性攻击面。</div><div class="ai-viewpoint">这一发现将 Agent 安全问题从「防外部攻击」扩展到「防内部记忆漂移」，是个性化 Agent 大规模部署前必须解决的核心风险；长期记忆的可审计性和选择性遗忘机制是下一个关键工程需求。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-22 10:00</span><span class="rss-author">机器之心</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzA3MzI4MjgzMw==&amp;mid=2651034410&amp;idx=1&amp;sn=8d1fce92f27fb31c31a4d3831eec4004&amp;chksm=85ac0bdfc6a52c9cbd83ca2246188d25f845dea2c797697b818a74eabe97f56b5d49d3532b2b&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">Meta华人发布ATLAS，一个词搞定可泛化的视觉推理！</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">Meta 华人提出 ATLAS：用一个离散词替代 Agentic 和潜在视觉推理，无需外部工具</div><div class="ai-summary">Meta AI 与香港中文大学提出 ATLAS，一种全新视觉推理范式：不调用外部工具、不显式生成中间图像、无视觉监督信号，仅用一个离散 word 作为视觉推理的中间表示，首次颠覆性地替代了 Agentic 和 Latent Visual Reasoning 两种主流方案。</div><div class="ai-viewpoint">用单个离散 word 作为视觉推理桥梁是极度简化的设计，若性能可泛化，意味着当前视觉推理的复杂 pipeline 存在严重冗余；但单个 token 是否足以编码复杂空间关系需要在多样化任务上深入验证。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-22 10:00</span><span class="rss-author">机器之心</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzA3MzI4MjgzMw==&amp;mid=2651034410&amp;idx=2&amp;sn=bd8e6fc293da020712d1ceeca898e8e2&amp;chksm=854040f6dd3ddcbc21bfdb995f4c78776641b615bd6b00c43855a9ee2079c1bbde95df7339b6&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">人形机器人的「指尖心脏」：这个团队用898天完成空心杯电机国产突围</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">898 天完成空心杯电机国产突围：人形机器人灵巧手「指尖心脏」实现国产化</div><div class="ai-summary">某团队用 898 天完成空心杯电机的国产化研发，这种体积仅几毫米、驱动灵巧手手指的微型电机此前高度依赖进口，是人形机器人灵巧操作的关键底层零部件；现已实现量产能力，解决了供应链卡脖子问题。</div><div class="ai-viewpoint">空心杯电机的国产化是人形机器人供应链自主化的重要节点；底层精密零部件的突破往往需要数年积累且不如模型突破引人注目，但其战略价值在 AI 硬件国产化趋势下正在被重新评估。</div></div>
+                        </div>
+                        <div class="rss-item">
+                            <div class="rss-meta"><span class="rss-time">05-22 10:00</span><span class="rss-author">机器之心</span>
+                            </div>
+                            <div class="rss-title"><a href="http://mp.weixin.qq.com/s?__biz=MzA3MzI4MjgzMw==&amp;mid=2651034410&amp;idx=3&amp;sn=17ad01c6c46f8d832dca46ab16b6981f&amp;chksm=859ca3be6ad5e945a7ffe6676f85c5ac5beac15ceb3159bcb1adf36f66884b1f4bc4b201cdc2&amp;scene=0&amp;xtrack=1#rd" target="_blank" class="rss-link">CVPR 2026 | 突破短视，理解变化！HiF-VLA：以motion为中心打造「边想边做」的世界动作模型</a>
+                            </div>
+<div class="ai-insight-box"><div class="ai-title">CVPR 2026 HiF-VLA：以运动为中心的双向时空推理框架，解决 VLA 长程任务的短视问题</div><div class="ai-summary">西湖大学等团队提出 HiF-VLA，以运动信号（Motion）而非密集像素帧作为时间信息输入，通过双向时空推理框架减少冗余背景干扰和推理延迟，解决现有 VLA 在长程任务中因静态背景堆叠导致的因果混淆和性能下降问题，CVPR 2026 接收。</div><div class="ai-viewpoint">以运动为中心代替以像素为中心是 VLA 时序建模的方向性改变，直接对应人类「关注变化」的感知机制；若泛化能力足够，将显著降低长程任务中的推理成本，是 VLA 走向实用部署的关键工程突破。</div></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="footer">
+                <div class="footer-content">
+                    由 <span class="project-name">AIOS</span> 生成
+                    
+                </div>
+            </div>
+        </div>
+
+        <script>
+            async function saveAsImage() {
+                const button = event.target;
+                const originalText = button.textContent;
+
+                try {
+                    button.textContent = '生成中...';
+                    button.disabled = true;
+                    window.scrollTo(0, 0);
+
+                    // 等待页面稳定
+                    await new Promise(resolve => setTimeout(resolve, 200));
+
+                    // 截图前隐藏按钮
+                    const buttons = document.querySelector('.save-buttons');
+                    buttons.style.visibility = 'hidden';
+
+                    // 再次等待确保按钮完全隐藏
+                    await new Promise(resolve => setTimeout(resolve, 100));
+
+                    const container = document.querySelector('.container');
+
+                    const canvas = await html2canvas(container, {
+                        backgroundColor: '#ffffff',
+                        scale: 1.5,
+                        useCORS: true,
+                        allowTaint: false,
+                        imageTimeout: 10000,
+                        removeContainer: false,
+                        foreignObjectRendering: false,
+                        logging: false,
+                        width: container.offsetWidth,
+                        height: container.offsetHeight,
+                        x: 0,
+                        y: 0,
+                        scrollX: 0,
+                        scrollY: 0,
+                        windowWidth: window.innerWidth,
+                        windowHeight: window.innerHeight
+                    });
+
+                    buttons.style.visibility = 'visible';
+
+                    const link = document.createElement('a');
+                    const now = new Date();
+                    const filename = `NewsPilot_热点新闻分析_${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}.png`;
+
+                    link.download = filename;
+                    link.href = canvas.toDataURL('image/png', 1.0);
+
+                    // 触发下载
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+
+                    button.textContent = '保存成功!';
+                    setTimeout(() => {
+                        button.textContent = originalText;
+                        button.disabled = false;
+                    }, 2000);
+
+                } catch (error) {
+                    const buttons = document.querySelector('.save-buttons');
+                    buttons.style.visibility = 'visible';
+                    button.textContent = '保存失败';
+                    setTimeout(() => {
+                        button.textContent = originalText;
+                        button.disabled = false;
+                    }, 2000);
+                }
+            }
+
+            async function saveAsMultipleImages() {
+                const button = event.target;
+                const originalText = button.textContent;
+                const container = document.querySelector('.container');
+                const scale = 1.5;
+                const maxHeight = 5000 / scale;
+
+                try {
+                    button.textContent = '分析中...';
+                    button.disabled = true;
+
+                    // 获取所有可能的分割元素
+                    const newsItems = Array.from(container.querySelectorAll('.news-item'));
+                    const wordGroups = Array.from(container.querySelectorAll('.word-group'));
+                    const newSection = container.querySelector('.new-section');
+                    const errorSection = container.querySelector('.error-section');
+                    const header = container.querySelector('.header');
+                    const footer = container.querySelector('.footer');
+
+                    // 计算元素位置和高度
+                    const containerRect = container.getBoundingClientRect();
+                    const elements = [];
+
+                    // 添加header作为必须包含的元素
+                    elements.push({
+                        type: 'header',
+                        element: header,
+                        top: 0,
+                        bottom: header.offsetHeight,
+                        height: header.offsetHeight
+                    });
+
+                    // 添加错误信息（如果存在）
+                    if (errorSection) {
+                        const rect = errorSection.getBoundingClientRect();
+                        elements.push({
+                            type: 'error',
+                            element: errorSection,
+                            top: rect.top - containerRect.top,
+                            bottom: rect.bottom - containerRect.top,
+                            height: rect.height
+                        });
+                    }
+
+                    // 按word-group分组处理news-item
+                    wordGroups.forEach(group => {
+                        const groupRect = group.getBoundingClientRect();
+                        const groupNewsItems = group.querySelectorAll('.news-item');
+
+                        // 添加word-group的header部分
+                        const wordHeader = group.querySelector('.word-header');
+                        if (wordHeader) {
+                            const headerRect = wordHeader.getBoundingClientRect();
+                            elements.push({
+                                type: 'word-header',
+                                element: wordHeader,
+                                parent: group,
+                                top: groupRect.top - containerRect.top,
+                                bottom: headerRect.bottom - containerRect.top,
+                                height: headerRect.height
+                            });
+                        }
+
+                        // 添加每个news-item
+                        groupNewsItems.forEach(item => {
+                            const rect = item.getBoundingClientRect();
+                            elements.push({
+                                type: 'news-item',
+                                element: item,
+                                parent: group,
+                                top: rect.top - containerRect.top,
+                                bottom: rect.bottom - containerRect.top,
+                                height: rect.height
+                            });
+                        });
+                    });
+
+                    // 添加新增新闻部分
+                    if (newSection) {
+                        const rect = newSection.getBoundingClientRect();
+                        elements.push({
+                            type: 'new-section',
+                            element: newSection,
+                            top: rect.top - containerRect.top,
+                            bottom: rect.bottom - containerRect.top,
+                            height: rect.height
+                        });
+                    }
+
+                    // 添加footer
+                    const footerRect = footer.getBoundingClientRect();
+                    elements.push({
+                        type: 'footer',
+                        element: footer,
+                        top: footerRect.top - containerRect.top,
+                        bottom: footerRect.bottom - containerRect.top,
+                        height: footer.offsetHeight
+                    });
+
+                    // 计算分割点
+                    const segments = [];
+                    let currentSegment = { start: 0, end: 0, height: 0, includeHeader: true };
+                    let headerHeight = header.offsetHeight;
+                    currentSegment.height = headerHeight;
+
+                    for (let i = 1; i < elements.length; i++) {
+                        const element = elements[i];
+                        const potentialHeight = element.bottom - currentSegment.start;
+
+                        // 检查是否需要创建新分段
+                        if (potentialHeight > maxHeight && currentSegment.height > headerHeight) {
+                            // 在前一个元素结束处分割
+                            currentSegment.end = elements[i - 1].bottom;
+                            segments.push(currentSegment);
+
+                            // 开始新分段
+                            currentSegment = {
+                                start: currentSegment.end,
+                                end: 0,
+                                height: element.bottom - currentSegment.end,
+                                includeHeader: false
+                            };
+                        } else {
+                            currentSegment.height = potentialHeight;
+                            currentSegment.end = element.bottom;
+                        }
+                    }
+
+                    // 添加最后一个分段
+                    if (currentSegment.height > 0) {
+                        currentSegment.end = container.offsetHeight;
+                        segments.push(currentSegment);
+                    }
+
+                    button.textContent = `生成中 (0/${segments.length})...`;
+
+                    // 隐藏保存按钮
+                    const buttons = document.querySelector('.save-buttons');
+                    buttons.style.visibility = 'hidden';
+
+                    // 为每个分段生成图片
+                    const images = [];
+                    for (let i = 0; i < segments.length; i++) {
+                        const segment = segments[i];
+                        button.textContent = `生成中 (${i + 1}/${segments.length})...`;
+
+                        // 创建临时容器用于截图
+                        const tempContainer = document.createElement('div');
+                        tempContainer.style.cssText = `
+                            position: absolute;
+                            left: -9999px;
+                            top: 0;
+                            width: ${container.offsetWidth}px;
+                            background: white;
+                        `;
+                        tempContainer.className = 'container';
+
+                        // 克隆容器内容
+                        const clonedContainer = container.cloneNode(true);
+
+                        // 移除克隆内容中的保存按钮
+                        const clonedButtons = clonedContainer.querySelector('.save-buttons');
+                        if (clonedButtons) {
+                            clonedButtons.style.display = 'none';
+                        }
+
+                        tempContainer.appendChild(clonedContainer);
+                        document.body.appendChild(tempContainer);
+
+                        // 等待DOM更新
+                        await new Promise(resolve => setTimeout(resolve, 100));
+
+                        // 使用html2canvas截取特定区域
+                        const canvas = await html2canvas(clonedContainer, {
+                            backgroundColor: '#ffffff',
+                            scale: scale,
+                            useCORS: true,
+                            allowTaint: false,
+                            imageTimeout: 10000,
+                            logging: false,
+                            width: container.offsetWidth,
+                            height: segment.end - segment.start,
+                            x: 0,
+                            y: segment.start,
+                            windowWidth: window.innerWidth,
+                            windowHeight: window.innerHeight
+                        });
+
+                        images.push(canvas.toDataURL('image/png', 1.0));
+
+                        // 清理临时容器
+                        document.body.removeChild(tempContainer);
+                    }
+
+                    // 恢复按钮显示
+                    buttons.style.visibility = 'visible';
+
+                    // 下载所有图片
+                    const now = new Date();
+                    const baseFilename = `NewsPilot_热点新闻分析_${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
+
+                    for (let i = 0; i < images.length; i++) {
+                        const link = document.createElement('a');
+                        link.download = `${baseFilename}_part${i + 1}.png`;
+                        link.href = images[i];
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+
+                        // 延迟一下避免浏览器阻止多个下载
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                    }
+
+                    button.textContent = `已保存 ${segments.length} 张图片!`;
+                    setTimeout(() => {
+                        button.textContent = originalText;
+                        button.disabled = false;
+                    }, 2000);
+
+                } catch (error) {
+                    console.error('分段保存失败:', error);
+                    const buttons = document.querySelector('.save-buttons');
+                    buttons.style.visibility = 'visible';
+                    button.textContent = '保存失败';
+                    setTimeout(() => {
+                        button.textContent = originalText;
+                        button.disabled = false;
+                    }, 2000);
+                }
+            }
+
+            document.addEventListener('DOMContentLoaded', function() {
+                window.scrollTo(0, 0);
+                initSelectionUI();
+            });
+
+            // === Weekly Export: Select & Export ===
+            let iaSelectMode = false;
+
+            function initSelectionUI() {
+                const items = Array.from(document.querySelectorAll('.rss-item, .news-item'));
+                let nextId = 1;
+
+                items.forEach(el => {
+                    if (el.dataset.iaSelectId) return;
+                    el.dataset.iaSelectId = String(nextId++);
+                    el.classList.add('ia-selectable');
+
+                    const pick = document.createElement('label');
+                    pick.className = 'ia-pick';
+                    pick.innerHTML = '<input type="checkbox" class="ia-pick-checkbox" />选择';
+
+                    const checkbox = pick.querySelector('input');
+                    checkbox.addEventListener('change', () => {
+                        el.classList.toggle('ia-selected', checkbox.checked);
+                        updateSelectionButtons();
+                    });
+
+                    el.prepend(pick);
+                });
+
+                updateSelectionButtons();
+            }
+
+            function getSelectedElementsInOrder() {
+                const all = Array.from(document.querySelectorAll('[data-ia-select-id]'));
+                return all.filter(el => {
+                    const checkbox = el.querySelector('.ia-pick-checkbox');
+                    return Boolean(checkbox && checkbox.checked);
+                });
+            }
+
+            function updateSelectionButtons() {
+                const toggleBtn = document.getElementById('iaToggleSelectBtn');
+                const clearBtn = document.getElementById('iaClearSelectBtn');
+                const exportBtn = document.getElementById('iaExportWeeklyBtn');
+
+                const selectedCount = getSelectedElementsInOrder().length;
+
+                if (toggleBtn) toggleBtn.textContent = iaSelectMode ? '退出选择' : '选择资讯';
+                if (clearBtn) clearBtn.disabled = selectedCount === 0;
+                if (exportBtn) exportBtn.disabled = selectedCount === 0;
+                if (exportBtn) exportBtn.textContent = selectedCount ? `生成周报（${selectedCount}）` : '生成周报';
+            }
+
+            function toggleSelectionMode() {
+                iaSelectMode = !iaSelectMode;
+                document.body.classList.toggle('select-mode', iaSelectMode);
+                updateSelectionButtons();
+            }
+
+            function clearSelections() {
+                const selected = getSelectedElementsInOrder();
+                selected.forEach(el => {
+                    const checkbox = el.querySelector('.ia-pick-checkbox');
+                    if (checkbox) checkbox.checked = false;
+                    el.classList.remove('ia-selected');
+                });
+                updateSelectionButtons();
+            }
+
+            function exportWeeklyDigest() {
+                const selected = getSelectedElementsInOrder();
+                if (selected.length === 0) {
+                    alert('请先选择若干条资讯再生成周报。');
+                    return;
+                }
+
+                const weeklyTitle = '操作系统部一周AI资讯洞察';
+                const styleEl = document.querySelector('style');
+                const baseCss = styleEl ? styleEl.textContent : '';
+
+                const extraCss = `
+                    .header-info { display: none !important; }
+                    .rss-section-header, .rss-section-title, .feed-header, .word-header { display: none !important; }
+                `;
+
+                const contentWrapper = document.createElement('div');
+                selected.forEach(el => {
+                    const clone = el.cloneNode(true);
+                    clone.classList.remove('ia-selected', 'ia-selectable');
+                    clone.querySelectorAll('.ia-pick').forEach(p => p.remove());
+
+                    clone.querySelectorAll('.ai-viewpoint').forEach(v => {
+                        const t = (v.textContent || '').trim();
+                        if (t && !t.startsWith('OS观点：')) v.textContent = `OS观点：${t}`;
+                    });
+
+                    contentWrapper.appendChild(clone);
+                });
+
+                const now = new Date();
+                const y = now.getFullYear();
+                const m = String(now.getMonth() + 1).padStart(2, '0');
+                const d = String(now.getDate()).padStart(2, '0');
+                const filename = `${weeklyTitle}_${y}${m}${d}.html`;
+
+                const html = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${weeklyTitle}</title>
+  <style>${baseCss}
+${extraCss}</style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="header-title">${weeklyTitle}</div>
+    </div>
+    <div class="content">
+      ${contentWrapper.innerHTML}
+    </div>
+    <div class="footer">
+      <div class="footer-content">
+        由 <span class="project-name">AIOS</span> 生成
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+
+                const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+        </script>
+    </body>
+    </html>
+    
